@@ -1,0 +1,410 @@
+{
+  "domain_name": "crypto",
+  "purpose": "Provides cryptographic primitives including Galois Field arithmetic, polynomial generation, secure random number generation, and complete Shamir's Secret Sharing implementation for air-gapped secret management",
+  "classes": [
+    {
+      "class_name": "GF256",
+      "purpose": "Implements GF(2^8) finite field arithmetic with constant-time operations to prevent side-channel attacks",
+      "methods": [
+        {
+          "method_name": "add",
+          "purpose": "Addition in GF(2^8) using XOR operation",
+          "contract": {
+            "inputs": ["a: int", "b: int"],
+            "outputs": ["int"],
+            "preconditions": ["a and b are valid GF(256) elements (0-255)"],
+            "postconditions": ["Returns a + b in GF(256)", "Operation is constant-time"]
+          },
+          "dependencies": []
+        },
+        {
+          "method_name": "multiply",
+          "purpose": "Multiplication in GF(2^8) using precomputed lookup table",
+          "contract": {
+            "inputs": ["a: int", "b: int"],
+            "outputs": ["int"],
+            "preconditions": ["a and b are valid GF(256) elements"],
+            "postconditions": ["Returns a * b in GF(256)", "Operation is constant-time via table lookup"]
+          },
+          "dependencies": ["_mulTable"]
+        },
+        {
+          "method_name": "divide",
+          "purpose": "Division in GF(2^8) using multiplicative inverse",
+          "contract": {
+            "inputs": ["a: int", "b: int"],
+            "outputs": ["int"],
+            "preconditions": ["a and b are valid GF(256) elements", "b != 0"],
+            "postconditions": ["Returns a / b in GF(256)", "Throws ArgumentError if b == 0"]
+          },
+          "dependencies": ["multiply", "_invTable"]
+        },
+        {
+          "method_name": "inverse",
+          "purpose": "Compute multiplicative inverse in GF(2^8)",
+          "contract": {
+            "inputs": ["a: int"],
+            "outputs": ["int"],
+            "preconditions": ["a is valid GF(256) element"],
+            "postconditions": ["Returns multiplicative inverse of a", "Returns 0 for input 0"]
+          },
+          "dependencies": ["_invTable"]
+        },
+        {
+          "method_name": "lagrangeInterpolate",
+          "purpose": "Perform Lagrange interpolation to reconstruct secret from shares",
+          "contract": {
+            "inputs": ["xValues: List<int>", "yValues: List<int>"],
+            "outputs": ["int"],
+            "preconditions": ["Arrays have same length", "All values are valid GF(256) elements"],
+            "postconditions": ["Returns constant term of interpolating polynomial"]
+          },
+          "dependencies": ["multiply", "divide", "subtract"]
+        },
+        {
+          "method_name": "evaluatePolynomial",
+          "purpose": "Evaluate polynomial at given x using Horner's method",
+          "contract": {
+            "inputs": ["coefficients: List<int>", "x: int"],
+            "outputs": ["int"],
+            "preconditions": ["All values are valid GF(256) elements"],
+            "postconditions": ["Returns polynomial evaluation at x"]
+          },
+          "dependencies": ["add", "multiply"]
+        }
+      ],
+      "dependencies": ["SecureRandom", "dart:typed_data"]
+    },
+    {
+      "class_name": "PolynomialGenerator",
+      "purpose": "Generates random polynomials for Shamir's Secret Sharing with cryptographically secure coefficients",
+      "methods": [
+        {
+          "method_name": "generatePolynomial",
+          "purpose": "Generate random polynomial with secret as constant term",
+          "contract": {
+            "inputs": ["secret: int", "threshold: int", "fieldSize?: int"],
+            "outputs": ["List<int>"],
+            "preconditions": ["threshold >= 2", "secret is valid GF(256) element", "threshold <= fieldSize"],
+            "postconditions": ["Returns polynomial coefficients", "Constant term equals secret", "Highest degree coefficient is non-zero"]
+          },
+          "dependencies": ["SecureRandom", "GF256"]
+        },
+        {
+          "method_name": "generateEvaluationPoints",
+          "purpose": "Generate unique x-values for share creation",
+          "contract": {
+            "inputs": ["n: int"],
+            "outputs": ["List<int>"],
+            "preconditions": ["n >= 1", "n <= 255"],
+            "postconditions": ["Returns n unique non-zero x values", "Values are sorted"]
+          },
+          "dependencies": ["SecureRandom"]
+        },
+        {
+          "method_name": "evaluatePolynomial",
+          "purpose": "Evaluate polynomial at x using GF(256) arithmetic",
+          "contract": {
+            "inputs": ["coefficients: List<int>", "x: int"],
+            "outputs": ["int"],
+            "preconditions": ["x is valid GF(256) element"],
+            "postconditions": ["Returns polynomial value at x"]
+          },
+          "dependencies": ["GF256.evaluatePolynomial"]
+        }
+      ],
+      "dependencies": ["GF256", "SecureRandom", "dart:typed_data"]
+    },
+    {
+      "class_name": "SecureRandom",
+      "purpose": "Cryptographically secure random number generator for field elements",
+      "methods": [
+        {
+          "method_name": "nextGF256Element",
+          "purpose": "Generate random element in GF(256)",
+          "contract": {
+            "inputs": [],
+            "outputs": ["int"],
+            "preconditions": [],
+            "postconditions": ["Returns cryptographically secure random byte (0-255)"]
+          },
+          "dependencies": ["dart:math.Random.secure"]
+        },
+        {
+          "method_name": "nextNonZeroGF256Element",
+          "purpose": "Generate random non-zero element in GF(256)",
+          "contract": {
+            "inputs": [],
+            "outputs": ["int"],
+            "preconditions": [],
+            "postconditions": ["Returns random byte (1-255)", "Never returns 0"]
+          },
+          "dependencies": ["nextGF256Element"]
+        }
+      ],
+      "dependencies": ["dart:math"]
+    },
+    {
+      "class_name": "Share",
+      "purpose": "Represents a single share in Shamir's Secret Sharing scheme with serialization support",
+      "methods": [
+        {
+          "method_name": "toJson",
+          "purpose": "Serialize share to JSON format",
+          "contract": {
+            "inputs": [],
+            "outputs": ["Map<String, dynamic>"],
+            "preconditions": [],
+            "postconditions": ["Returns JSON-serializable map with x, y, and optional metadata"]
+          },
+          "dependencies": []
+        },
+        {
+          "method_name": "fromJson",
+          "purpose": "Deserialize share from JSON format",
+          "contract": {
+            "inputs": ["json: Map<String, dynamic>"],
+            "outputs": ["Share"],
+            "preconditions": ["JSON contains x and y keys"],
+            "postconditions": ["Returns reconstructed Share object"]
+          },
+          "dependencies": []
+        },
+        {
+          "method_name": "toBase64",
+          "purpose": "Convert share to base64 string for transmission",
+          "contract": {
+            "inputs": [],
+            "outputs": ["String"],
+            "preconditions": [],
+            "postconditions": ["Returns base64-encoded share data"]
+          },
+          "dependencies": ["toJson", "dart:convert"]
+        },
+        {
+          "method_name": "isValid",
+          "purpose": "Validate share has legal field values",
+          "contract": {
+            "inputs": [],
+            "outputs": ["bool"],
+            "preconditions": [],
+            "postconditions": ["Returns true if x and y are valid GF(256) elements and x != 0"]
+          },
+          "dependencies": ["GF256.isValidElement"]
+        }
+      ],
+      "dependencies": ["GF256", "dart:convert", "dart:typed_data"]
+    },
+    {
+      "class_name": "SecureShare",
+      "purpose": "Extended share with integrity verification and metadata tracking",
+      "methods": [
+        {
+          "method_name": "calculateChecksum",
+          "purpose": "Calculate integrity checksum for share data",
+          "contract": {
+            "inputs": ["x: int", "y: int", "threshold: int", "totalShares: int"],
+            "outputs": ["int"],
+            "preconditions": [],
+            "postconditions": ["Returns XOR-based checksum of share parameters"]
+          },
+          "dependencies": []
+        },
+        {
+          "method_name": "hasValidChecksum",
+          "purpose": "Verify share integrity against stored checksum",
+          "contract": {
+            "inputs": [],
+            "outputs": ["bool"],
+            "preconditions": [],
+            "postconditions": ["Returns true if checksum matches calculated value"]
+          },
+          "dependencies": ["calculateChecksum"]
+        }
+      ],
+      "dependencies": ["Share"]
+    },
+    {
+      "class_name": "ShareSet",
+      "purpose": "Container for multiple shares representing multi-byte secrets",
+      "methods": [
+        {
+          "method_name": "getShareAt",
+          "purpose": "Retrieve share at specific byte position",
+          "contract": {
+            "inputs": ["index: int"],
+            "outputs": ["Share?"],
+            "preconditions": [],
+            "postconditions": ["Returns share at index or null if out of bounds"]
+          },
+          "dependencies": []
+        },
+        {
+          "method_name": "toJson",
+          "purpose": "Serialize entire share set to JSON",
+          "contract": {
+            "inputs": [],
+            "outputs": ["Map<String, dynamic>"],
+            "preconditions": [],
+            "postconditions": ["Returns JSON with shares array and metadata"]
+          },
+          "dependencies": ["Share.toJson", "ShareSetMetadata.toJson"]
+        }
+      ],
+      "dependencies": ["Share", "ShareSetMetadata", "dart:convert"]
+    },
+    {
+      "class_name": "ShareGenerator",
+      "purpose": "Factory for creating shares from secrets using secure random polynomials",
+      "methods": [
+        {
+          "method_name": "generateShares",
+          "purpose": "Generate shares for single-byte secret",
+          "contract": {
+            "inputs": ["secret: int", "threshold: int", "totalShares: int"],
+            "outputs": ["List<Share>"],
+            "preconditions": ["secret is valid byte", "threshold >= 2", "totalShares >= threshold"],
+            "postconditions": ["Returns totalShares number of Share objects"]
+          },
+          "dependencies": ["PolynomialGenerator", "Share"]
+        },
+        {
+          "method_name": "generateSecureShares",
+          "purpose": "Generate shares with integrity checksums and metadata",
+          "contract": {
+            "inputs": ["secret: int", "threshold: int", "totalShares: int", "identifier?: String", "version?: int"],
+            "outputs": ["List<SecureShare>"],
+            "preconditions": ["Same as generateShares"],
+            "postconditions": ["Returns SecureShare objects with checksums"]
+          },
+          "dependencies": ["generateShares", "SecureShare"]
+        },
+        {
+          "method_name": "generateShareSets",
+          "purpose": "Generate shares for multi-byte secrets",
+          "contract": {
+            "inputs": ["secretBytes: Uint8List", "threshold: int", "totalShares: int", "description?: String"],
+            "outputs": ["List<ShareSet>"],
+            "preconditions": ["secretBytes not empty", "threshold and share constraints"],
+            "postconditions": ["Returns ShareSet for each participant with shares for all bytes"]
+          },
+          "dependencies": ["generateShares", "ShareSet", "ShareSetMetadata"]
+        }
+      ],
+      "dependencies": ["PolynomialGenerator", "Share", "SecureShare", "ShareSet", "dart:typed_data"]
+    },
+    {
+      "class_name": "SecretReconstructor",
+      "purpose": "Reconstructs secrets from threshold number of shares using Lagrange interpolation",
+      "methods": [
+        {
+          "method_name": "reconstructSecret",
+          "purpose": "Reconstruct single-byte secret from shares",
+          "contract": {
+            "inputs": ["shares: List<Share>"],
+            "outputs": ["int"],
+            "preconditions": ["shares.length >= threshold", "shares have unique x values"],
+            "postconditions": ["Returns original secret byte"]
+          },
+          "dependencies": ["GF256.lagrangeInterpolate"]
+        },
+        {
+          "method_name": "reconstructFromShareSets",
+          "purpose": "Reconstruct multi-byte secret from share sets",
+          "contract": {
+            "inputs": ["shareSets: List<ShareSet>"],
+            "outputs": ["Uint8List"],
+            "preconditions": ["shareSets.length >= threshold", "all sets have same metadata"],
+            "postconditions": ["Returns original secret bytes"]
+          },
+          "dependencies": ["reconstructSecret", "ShareSet"]
+        },
+        {
+          "method_name": "canReconstruct",
+          "purpose": "Check if shares are sufficient for reconstruction without actually reconstructing",
+          "contract": {
+            "inputs": ["shares: List<Share>", "threshold: int"],
+            "outputs": ["bool"],
+            "preconditions": [],
+            "postconditions": ["Returns true if reconstruction is possible"]
+          },
+          "dependencies": []
+        }
+      ],
+      "dependencies": ["GF256", "Share", "ShareSet", "dart:typed_data"]
+    },
+    {
+      "class_name": "ShamirSecretSharing",
+      "purpose": "Main facade providing high-level API for secret sharing operations",
+      "methods": [
+        {
+          "method_name": "splitByte",
+          "purpose": "Split single byte into shares with result metadata",
+          "contract": {
+            "inputs": ["secret: int", "threshold: int", "shares: int"],
+            "outputs": ["SplitResult"],
+            "preconditions": ["secret 0-255", "threshold >= 2", "shares <= 255"],
+            "postconditions": ["Returns SplitResult with shares and metadata"]
+          },
+          "dependencies": ["ShareGenerator", "SplitResult"]
+        },
+        {
+          "method_name": "splitBytes",
+          "purpose": "Split byte array into share sets",
+          "contract": {
+            "inputs": ["secret: Uint8List", "threshold: int", "shares: int"],
+            "outputs": ["MultiSplitResult"],
+            "preconditions": ["secret not empty", "threshold and share constraints"],
+            "postconditions": ["Returns MultiSplitResult with share sets"]
+          },
+          "dependencies": ["ShareGenerator", "MultiSplitResult"]
+        },
+        {
+          "method_name": "splitString",
+          "purpose": "Split UTF-8 string into share sets",
+          "contract": {
+            "inputs": ["secret: String", "threshold: int", "shares: int"],
+            "outputs": ["MultiSplitResult"],
+            "preconditions": ["secret not empty"],
+            "postconditions": ["Returns MultiSplitResult with UTF-8 metadata"]
+          },
+          "dependencies": ["splitBytes", "dart:convert"]
+        },
+        {
+          "method_name": "combineByte",
+          "purpose": "Reconstruct single byte from shares",
+          "contract": {
+            "inputs": ["shares: List<Share>", "threshold: int"],
+            "outputs": ["int"],
+            "preconditions": ["shares.length >= threshold"],
+            "postconditions": ["Returns original secret byte"]
+          },
+          "dependencies": ["SecretReconstructor"]
+        },
+        {
+          "method_name": "combineBytes",
+          "purpose": "Reconstruct byte array from share sets",
+          "contract": {
+            "inputs": ["shareSets: List<ShareSet>"],
+            "outputs": ["Uint8List"],
+            "preconditions": ["shareSets not empty", "sufficient shares"],
+            "postconditions": ["Returns original secret bytes"]
+          },
+          "dependencies": ["SecretReconstructor"]
+        },
+        {
+          "method_name": "combineString",
+          "purpose": "Reconstruct UTF-8 string from share sets",
+          "contract": {
+            "inputs": ["shareSets: List<ShareSet>"],
+            "outputs": ["String"],
+            "preconditions": ["Same as combineBytes"],
+            "postconditions": ["Returns original UTF-8 string"]
+          },
+          "dependencies": ["combineBytes", "dart:convert"]
+        }
+      ],
+      "dependencies": ["ShareGenerator", "SecretReconstructor", "Share", "ShareSet", "dart:convert", "dart:typed_data"]
+    }
+  ]
+}

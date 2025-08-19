@@ -1,0 +1,19 @@
+{
+  "domains": [
+    {
+      "name": "crypto",
+      "purpose": "Provides cryptographic primitives including Galois Field arithmetic, polynomial generation, secure random number generation, and complete Shamir's Secret Sharing implementation for air-gapped secret management",
+      "map_path": "lib/domains/crypto/map.json"
+    },
+    {
+      "name": "auth",
+      "purpose": "Provides secure PIN-based authentication with PBKDF2 hashing, progressive lockout protection, and air-gapped storage for cryptographic secret management",
+      "map_path": "lib/domains/auth/map.json"
+    },
+    {
+      "name": "presentation",
+      "purpose": "Provides Flutter UI components, state management, and user interaction layer for secure cryptographic operations with Material Design 3 theming and responsive layouts",
+      "map_path": "lib/presentation/map.json"
+    }
+  ]
+}

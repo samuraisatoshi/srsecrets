@@ -1,0 +1,367 @@
+{
+  "domain_name": "auth",
+  "purpose": "Provides secure PIN-based authentication with PBKDF2 hashing, progressive lockout protection, and air-gapped storage for cryptographic secret management",
+  "classes": [
+    {
+      "class_name": "PinHash",
+      "purpose": "Immutable value object representing securely hashed PIN with salt and iteration metadata",
+      "methods": [
+        {
+          "method_name": "fromSalt",
+          "purpose": "Create PinHash with explicit salt for testing or migration",
+          "contract": {
+            "inputs": ["hash: Uint8List", "salt: Uint8List", "iterations: int", "createdAt: DateTime"],
+            "outputs": ["PinHash"],
+            "preconditions": ["hash and salt not empty", "iterations > 0"],
+            "postconditions": ["Returns immutable PinHash instance"]
+          },
+          "dependencies": ["dart:typed_data"]
+        },
+        {
+          "method_name": "needsUpgrade",
+          "purpose": "Check if hash requires security parameter upgrade",
+          "contract": {
+            "inputs": ["minimumIterations: int"],
+            "outputs": ["bool"],
+            "preconditions": ["minimumIterations > 0"],
+            "postconditions": ["Returns true if current iterations < minimum"]
+          },
+          "dependencies": []
+        },
+        {
+          "method_name": "toJson",
+          "purpose": "Serialize hash to JSON for secure storage",
+          "contract": {
+            "inputs": [],
+            "outputs": ["Map<String, dynamic>"],
+            "preconditions": [],
+            "postconditions": ["Returns JSON with base64-encoded hash/salt and metadata"]
+          },
+          "dependencies": ["dart:convert"]
+        },
+        {
+          "method_name": "fromJson",
+          "purpose": "Deserialize hash from secure storage",
+          "contract": {
+            "inputs": ["json: Map<String, dynamic>"],
+            "outputs": ["PinHash"],
+            "preconditions": ["JSON contains required fields with valid base64"],
+            "postconditions": ["Returns reconstructed PinHash instance"]
+          },
+          "dependencies": ["dart:convert", "dart:typed_data"]
+        }
+      ],
+      "dependencies": ["dart:typed_data", "dart:convert"]
+    },
+    {
+      "class_name": "AuthAttempt",
+      "purpose": "Records individual authentication attempt with timestamp for lockout tracking",
+      "methods": [
+        {
+          "method_name": "fromJson",
+          "purpose": "Deserialize attempt from storage",
+          "contract": {
+            "inputs": ["json: Map<String, dynamic>"],
+            "outputs": ["AuthAttempt"],
+            "preconditions": ["JSON contains timestamp and success fields"],
+            "postconditions": ["Returns AuthAttempt instance"]
+          },
+          "dependencies": ["dart:convert"]
+        },
+        {
+          "method_name": "toJson",
+          "purpose": "Serialize attempt for storage",
+          "contract": {
+            "inputs": [],
+            "outputs": ["Map<String, dynamic>"],
+            "preconditions": [],
+            "postconditions": ["Returns JSON representation"]
+          },
+          "dependencies": []
+        }
+      ],
+      "dependencies": []
+    },
+    {
+      "class_name": "AuthAttemptHistory",
+      "purpose": "Manages authentication attempt tracking with configurable lockout policies",
+      "methods": [
+        {
+          "method_name": "addAttempt",
+          "purpose": "Record new authentication attempt and update lockout state",
+          "contract": {
+            "inputs": ["success: bool"],
+            "outputs": ["void"],
+            "preconditions": [],
+            "postconditions": ["Attempt added to history", "Lockout state updated", "History pruned if needed"]
+          },
+          "dependencies": ["AuthAttempt"]
+        },
+        {
+          "method_name": "isLocked",
+          "purpose": "Check if account is currently locked due to failed attempts",
+          "contract": {
+            "inputs": [],
+            "outputs": ["bool"],
+            "preconditions": [],
+            "postconditions": ["Returns true if lockout is active"]
+          },
+          "dependencies": []
+        },
+        {
+          "method_name": "getLockoutRemaining",
+          "purpose": "Get remaining lockout duration",
+          "contract": {
+            "inputs": [],
+            "outputs": ["Duration?"],
+            "preconditions": [],
+            "postconditions": ["Returns remaining duration or null if not locked"]
+          },
+          "dependencies": []
+        },
+        {
+          "method_name": "getFailedAttemptCount",
+          "purpose": "Count recent failed attempts for lockout calculation",
+          "contract": {
+            "inputs": [],
+            "outputs": ["int"],
+            "preconditions": [],
+            "postconditions": ["Returns count of failed attempts in lockout window"]
+          },
+          "dependencies": []
+        },
+        {
+          "method_name": "clearHistory",
+          "purpose": "Reset attempt history (admin operation)",
+          "contract": {
+            "inputs": [],
+            "outputs": ["void"],
+            "preconditions": [],
+            "postconditions": ["All attempts cleared", "Lockout state reset"]
+          },
+          "dependencies": []
+        }
+      ],
+      "dependencies": ["AuthAttempt"]
+    },
+    {
+      "class_name": "Pbkdf2CryptoProvider",
+      "purpose": "PBKDF2-HMAC-SHA256 implementation with timing attack protection and performance calibration",
+      "methods": [
+        {
+          "method_name": "hashPin",
+          "purpose": "Generate secure hash from PIN with random salt",
+          "contract": {
+            "inputs": ["pin: String", "iterations?: int"],
+            "outputs": ["PinHash"],
+            "preconditions": ["pin not empty"],
+            "postconditions": ["Returns PinHash with 256-bit salt and configurable iterations"]
+          },
+          "dependencies": ["PinHash", "dart:crypto", "SecureRandom"]
+        },
+        {
+          "method_name": "verifyPin",
+          "purpose": "Verify PIN against stored hash with constant-time comparison",
+          "contract": {
+            "inputs": ["pin: String", "storedHash: PinHash"],
+            "outputs": ["bool"],
+            "preconditions": ["pin not empty", "storedHash valid"],
+            "postconditions": ["Returns verification result", "Operation timing is constant regardless of result"]
+          },
+          "dependencies": ["PinHash", "dart:crypto"]
+        },
+        {
+          "method_name": "calibrateIterations",
+          "purpose": "Determine optimal PBKDF2 iterations for device performance",
+          "contract": {
+            "inputs": ["targetMilliseconds: int"],
+            "outputs": ["int"],
+            "preconditions": ["targetMilliseconds > 0"],
+            "postconditions": ["Returns iteration count achieving target timing"]
+          },
+          "dependencies": ["hashPin", "dart:async"]
+        },
+        {
+          "method_name": "constantTimeEquals",
+          "purpose": "Compare byte arrays with constant time to prevent timing attacks",
+          "contract": {
+            "inputs": ["a: Uint8List", "b: Uint8List"],
+            "outputs": ["bool"],
+            "preconditions": [],
+            "postconditions": ["Returns equality result", "Execution time independent of input similarity"]
+          },
+          "dependencies": ["dart:typed_data"]
+        }
+      ],
+      "dependencies": ["PinHash", "SecureRandom", "dart:crypto", "dart:typed_data", "dart:async"]
+    },
+    {
+      "class_name": "SecureStorageRepository",
+      "purpose": "Air-gapped file-based storage with XOR encryption and secure deletion for authentication data",
+      "methods": [
+        {
+          "method_name": "storePinHash",
+          "purpose": "Securely store PIN hash with file-level encryption",
+          "contract": {
+            "inputs": ["hash: PinHash"],
+            "outputs": ["Future<void>"],
+            "preconditions": ["hash is valid"],
+            "postconditions": ["Hash encrypted and stored", "File permissions restricted to owner"]
+          },
+          "dependencies": ["PinHash", "path_provider", "_encryptData"]
+        },
+        {
+          "method_name": "loadPinHash",
+          "purpose": "Load and decrypt stored PIN hash",
+          "contract": {
+            "inputs": [],
+            "outputs": ["Future<PinHash?>"],
+            "preconditions": [],
+            "postconditions": ["Returns decrypted hash or null if not found"]
+          },
+          "dependencies": ["PinHash", "_decryptData"]
+        },
+        {
+          "method_name": "storeAttemptHistory",
+          "purpose": "Store authentication attempt history securely",
+          "contract": {
+            "inputs": ["history: AuthAttemptHistory"],
+            "outputs": ["Future<void>"],
+            "preconditions": [],
+            "postconditions": ["History encrypted and stored"]
+          },
+          "dependencies": ["AuthAttemptHistory", "_encryptData"]
+        },
+        {
+          "method_name": "loadAttemptHistory",
+          "purpose": "Load stored attempt history",
+          "contract": {
+            "inputs": [],
+            "outputs": ["Future<AuthAttemptHistory>"],
+            "preconditions": [],
+            "postconditions": ["Returns history or new instance if none stored"]
+          },
+          "dependencies": ["AuthAttemptHistory", "_decryptData"]
+        },
+        {
+          "method_name": "deletePinData",
+          "purpose": "Securely delete all PIN-related data",
+          "contract": {
+            "inputs": [],
+            "outputs": ["Future<void>"],
+            "preconditions": [],
+            "postconditions": ["All authentication files securely overwritten and deleted"]
+          },
+          "dependencies": ["_secureDelete"]
+        },
+        {
+          "method_name": "_encryptData",
+          "purpose": "XOR encrypt data with derived key for storage obfuscation",
+          "contract": {
+            "inputs": ["data: Uint8List"],
+            "outputs": ["Uint8List"],
+            "preconditions": ["data not empty"],
+            "postconditions": ["Returns XOR-encrypted data"]
+          },
+          "dependencies": ["dart:crypto", "dart:typed_data"]
+        },
+        {
+          "method_name": "_secureDelete",
+          "purpose": "Overwrite file multiple times before deletion",
+          "contract": {
+            "inputs": ["file: File"],
+            "outputs": ["Future<void>"],
+            "preconditions": ["file exists"],
+            "postconditions": ["File overwritten with random data 3 times then deleted"]
+          },
+          "dependencies": ["dart:io", "SecureRandom"]
+        }
+      ],
+      "dependencies": ["PinHash", "AuthAttemptHistory", "path_provider", "dart:crypto", "dart:io", "dart:typed_data", "SecureRandom"]
+    },
+    {
+      "class_name": "PinServiceImpl",
+      "purpose": "Complete PIN authentication service implementing business logic with security validation and lockout management",
+      "methods": [
+        {
+          "method_name": "isPinSet",
+          "purpose": "Check if user has configured a PIN",
+          "contract": {
+            "inputs": [],
+            "outputs": ["Future<bool>"],
+            "preconditions": [],
+            "postconditions": ["Returns true if PIN hash exists in storage"]
+          },
+          "dependencies": ["IPinStorageRepository"]
+        },
+        {
+          "method_name": "setPin",
+          "purpose": "Set new PIN with security validation",
+          "contract": {
+            "inputs": ["pin: String"],
+            "outputs": ["Future<PinHash>"],
+            "preconditions": ["pin meets security requirements"],
+            "postconditions": ["PIN hash stored", "Attempt history cleared", "Returns generated hash"]
+          },
+          "dependencies": ["validatePin", "IPinCryptoProvider", "IPinStorageRepository"]
+        },
+        {
+          "method_name": "authenticate",
+          "purpose": "Authenticate user with PIN and lockout protection",
+          "contract": {
+            "inputs": ["pin: String"],
+            "outputs": ["Future<PinAuthResult>"],
+            "preconditions": ["PIN is set"],
+            "postconditions": ["Authentication result with lockout status", "Attempt recorded in history"]
+          },
+          "dependencies": ["IPinCryptoProvider", "IPinStorageRepository", "AuthAttemptHistory"]
+        },
+        {
+          "method_name": "changePin",
+          "purpose": "Change existing PIN with current PIN verification",
+          "contract": {
+            "inputs": ["currentPin: String", "newPin: String"],
+            "outputs": ["Future<PinHash>"],
+            "preconditions": ["currentPin is correct", "newPin meets requirements"],
+            "postconditions": ["New PIN hash stored", "Attempt history cleared"]
+          },
+          "dependencies": ["authenticate", "setPin"]
+        },
+        {
+          "method_name": "resetPin",
+          "purpose": "Administrative PIN reset without current PIN (security risk operation)",
+          "contract": {
+            "inputs": ["newPin: String"],
+            "outputs": ["Future<PinHash>"],
+            "preconditions": ["newPin meets requirements"],
+            "postconditions": ["New PIN set", "All authentication data cleared"]
+          },
+          "dependencies": ["validatePin", "IPinStorageRepository"]
+        },
+        {
+          "method_name": "validatePin",
+          "purpose": "Validate PIN against security requirements",
+          "contract": {
+            "inputs": ["pin: String"],
+            "outputs": ["void"],
+            "preconditions": [],
+            "postconditions": ["Throws PinValidationException if PIN fails requirements"]
+          },
+          "dependencies": ["PinRequirements"]
+        },
+        {
+          "method_name": "needsUpgrade",
+          "purpose": "Check if stored PIN hash needs security parameter upgrade",
+          "contract": {
+            "inputs": [],
+            "outputs": ["Future<bool>"],
+            "preconditions": ["PIN is set"],
+            "postconditions": ["Returns true if hash needs upgrade"]
+          },
+          "dependencies": ["IPinStorageRepository", "PinHash"]
+        }
+      ],
+      "dependencies": ["IPinCryptoProvider", "IPinStorageRepository", "PinHash", "AuthAttemptHistory", "PinAuthResult", "PinValidationException", "PinRequirements"]
+    }
+  ]
+}

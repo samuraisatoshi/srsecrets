@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "squad-team": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "/Users/jfoc/Documents/DevLabs/javascript/mcp-servers/ios-squad/src/index.js"
+      ],
+      "env": {}
+    }
+  }
+}

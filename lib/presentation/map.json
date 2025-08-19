@@ -1,0 +1,349 @@
+{
+  "domain_name": "presentation",
+  "purpose": "Provides Flutter UI components, state management, and user interaction layer for secure cryptographic operations with Material Design 3 theming and responsive layouts",
+  "classes": [
+    {
+      "class_name": "AuthProvider",
+      "purpose": "State management for PIN-based authentication with lockout protection and user session handling",
+      "methods": [
+        {
+          "method_name": "checkAuthStatus",
+          "purpose": "Initialize authentication state on app startup",
+          "contract": {
+            "inputs": [],
+            "outputs": ["Future<void>"],
+            "preconditions": [],
+            "postconditions": ["PIN setup status determined", "Authentication state reset", "Loading state updated"]
+          },
+          "dependencies": ["IPinService.isPinSet"]
+        },
+        {
+          "method_name": "setupPin",
+          "purpose": "Create new PIN and authenticate user automatically",
+          "contract": {
+            "inputs": ["pin: String"],
+            "outputs": ["Future<bool>"],
+            "preconditions": ["pin passes validation"],
+            "postconditions": ["PIN stored securely", "User authenticated", "Returns success status"]
+          },
+          "dependencies": ["IPinService.setPin", "isValidPin"]
+        },
+        {
+          "method_name": "authenticate",
+          "purpose": "Authenticate user with PIN and handle lockout logic",
+          "contract": {
+            "inputs": ["pin: String"],
+            "outputs": ["Future<bool>"],
+            "preconditions": ["PIN is set", "Account not locked"],
+            "postconditions": ["Authentication result determined", "Failed attempts tracked", "Lockout state updated"]
+          },
+          "dependencies": ["IPinService.authenticate"]
+        },
+        {
+          "method_name": "logout",
+          "purpose": "Clear authentication state and return to login screen",
+          "contract": {
+            "inputs": [],
+            "outputs": ["void"],
+            "preconditions": [],
+            "postconditions": ["User logged out", "Authentication state cleared"]
+          },
+          "dependencies": []
+        },
+        {
+          "method_name": "isValidPin",
+          "purpose": "Validate PIN format before authentication attempts",
+          "contract": {
+            "inputs": ["pin: String"],
+            "outputs": ["bool"],
+            "preconditions": [],
+            "postconditions": ["Returns true if PIN format is valid (4-8 digits)"]
+          },
+          "dependencies": []
+        }
+      ],
+      "dependencies": ["ChangeNotifier", "IPinService", "PinServiceImpl"]
+    },
+    {
+      "class_name": "SecretProvider",
+      "purpose": "State management for Shamir secret sharing operations including creation, reconstruction, and share distribution",
+      "methods": [
+        {
+          "method_name": "createSecret",
+          "purpose": "Split secret into shares using Shamir's Secret Sharing",
+          "contract": {
+            "inputs": ["secretName: String", "secret: String", "threshold: int", "totalShares: int"],
+            "outputs": ["Future<bool>"],
+            "preconditions": ["secret not empty", "threshold >= 2", "totalShares >= threshold"],
+            "postconditions": ["Secret split into shares", "Distribution packages created", "Local secret info stored"]
+          },
+          "dependencies": ["ShamirSecretSharing.splitString", "SecretInfo"]
+        },
+        {
+          "method_name": "reconstructSecret",
+          "purpose": "Reconstruct original secret from provided shares",
+          "contract": {
+            "inputs": ["shareStrings: List<String>"],
+            "outputs": ["Future<bool>"],
+            "preconditions": ["shareStrings contains valid shares", "sufficient shares provided"],
+            "postconditions": ["Original secret reconstructed", "Result stored in provider state"]
+          },
+          "dependencies": ["ShareSet.fromJson", "ShareSet.fromBase64", "ShamirSecretSharing.combineString"]
+        },
+        {
+          "method_name": "getDistributionPackages",
+          "purpose": "Get participant packages for secure share distribution",
+          "contract": {
+            "inputs": [],
+            "outputs": ["List<ParticipantPackage>"],
+            "preconditions": ["secret has been split (lastResult exists)"],
+            "postconditions": ["Returns packages ready for distribution"]
+          },
+          "dependencies": ["MultiSplitResult.createDistributionPackages"]
+        },
+        {
+          "method_name": "clearResults",
+          "purpose": "Clear current operation results and reset state",
+          "contract": {
+            "inputs": [],
+            "outputs": ["void"],
+            "preconditions": [],
+            "postconditions": ["Operation results cleared", "UI state reset"]
+          },
+          "dependencies": []
+        }
+      ],
+      "dependencies": ["ChangeNotifier", "ShamirSecretSharing", "ShareSet", "ParticipantPackage", "SecretInfo"]
+    },
+    {
+      "class_name": "SecretInfo",
+      "purpose": "Data model for secret metadata and local storage representation",
+      "methods": [],
+      "dependencies": []
+    },
+    {
+      "class_name": "PinSetupScreen",
+      "purpose": "Two-step PIN creation flow with confirmation and validation",
+      "methods": [
+        {
+          "method_name": "build",
+          "purpose": "Build PIN setup UI with stepper interface",
+          "contract": {
+            "inputs": ["context: BuildContext"],
+            "outputs": ["Widget"],
+            "preconditions": [],
+            "postconditions": ["Returns responsive PIN setup interface"]
+          },
+          "dependencies": ["PinInputWidget", "AuthProvider"]
+        }
+      ],
+      "dependencies": ["StatefulWidget", "PinInputWidget", "AuthProvider"]
+    },
+    {
+      "class_name": "PinLoginScreen", 
+      "purpose": "PIN authentication interface with lockout protection display",
+      "methods": [
+        {
+          "method_name": "build",
+          "purpose": "Build login UI with PIN input and error handling",
+          "contract": {
+            "inputs": ["context: BuildContext"],
+            "outputs": ["Widget"],
+            "preconditions": [],
+            "postconditions": ["Returns secure login interface"]
+          },
+          "dependencies": ["PinInputWidget", "AuthProvider"]
+        }
+      ],
+      "dependencies": ["StatefulWidget", "PinInputWidget", "AuthProvider"]
+    },
+    {
+      "class_name": "HomeScreen",
+      "purpose": "Main navigation hub with tabbed interface for secret operations",
+      "methods": [
+        {
+          "method_name": "build",
+          "purpose": "Build main application interface with bottom navigation",
+          "contract": {
+            "inputs": ["context: BuildContext"],
+            "outputs": ["Widget"],
+            "preconditions": ["user is authenticated"],
+            "postconditions": ["Returns main app interface with navigation tabs"]
+          },
+          "dependencies": ["CreateSecretScreen", "ReconstructSecretScreen", "SecretsListScreen"]
+        }
+      ],
+      "dependencies": ["StatefulWidget", "CreateSecretScreen", "ReconstructSecretScreen", "SecretsListScreen"]
+    },
+    {
+      "class_name": "CreateSecretScreen",
+      "purpose": "Interface for creating new secrets with Shamir parameters configuration",
+      "methods": [
+        {
+          "method_name": "build",
+          "purpose": "Build secret creation form with validation and parameter selection",
+          "contract": {
+            "inputs": ["context: BuildContext"],
+            "outputs": ["Widget"],
+            "preconditions": [],
+            "postconditions": ["Returns secret creation interface"]
+          },
+          "dependencies": ["SecretProvider"]
+        }
+      ],
+      "dependencies": ["StatefulWidget", "SecretProvider"]
+    },
+    {
+      "class_name": "ReconstructSecretScreen",
+      "purpose": "Interface for reconstructing secrets from collected shares",
+      "methods": [
+        {
+          "method_name": "build",
+          "purpose": "Build share input interface with dynamic share collection",
+          "contract": {
+            "inputs": ["context: BuildContext"],
+            "outputs": ["Widget"],
+            "preconditions": [],
+            "postconditions": ["Returns share reconstruction interface"]
+          },
+          "dependencies": ["SecretProvider"]
+        }
+      ],
+      "dependencies": ["StatefulWidget", "SecretProvider"]
+    },
+    {
+      "class_name": "ShareDistributionScreen",
+      "purpose": "Interface for distributing generated shares to participants with secure sharing options",
+      "methods": [
+        {
+          "method_name": "build",
+          "purpose": "Build share distribution interface with copy and share actions",
+          "contract": {
+            "inputs": ["context: BuildContext"],
+            "outputs": ["Widget"],
+            "preconditions": ["shares have been generated"],
+            "postconditions": ["Returns share distribution interface"]
+          },
+          "dependencies": ["ShareCardWidget", "SecretProvider"]
+        },
+        {
+          "method_name": "_copyShare",
+          "purpose": "Copy individual share to clipboard with user feedback",
+          "contract": {
+            "inputs": ["shareJson: String"],
+            "outputs": ["void"],
+            "preconditions": ["shareJson is valid"],
+            "postconditions": ["Share copied to clipboard", "User notified"]
+          },
+          "dependencies": ["Clipboard"]
+        },
+        {
+          "method_name": "_sharePackage",
+          "purpose": "Share complete participant package with instructions",
+          "contract": {
+            "inputs": ["package: ParticipantPackage"],
+            "outputs": ["void"],
+            "preconditions": ["package is valid"],
+            "postconditions": ["Package formatted and copied to clipboard"]
+          },
+          "dependencies": ["Clipboard", "ParticipantPackage"]
+        }
+      ],
+      "dependencies": ["StatefulWidget", "ShareCardWidget", "SecretProvider", "Clipboard"]
+    },
+    {
+      "class_name": "SecretsListScreen",
+      "purpose": "Interface for viewing and managing created secrets history",
+      "methods": [
+        {
+          "method_name": "build",
+          "purpose": "Build secrets list with management actions",
+          "contract": {
+            "inputs": ["context: BuildContext"],
+            "outputs": ["Widget"],
+            "preconditions": [],
+            "postconditions": ["Returns secrets management interface"]
+          },
+          "dependencies": ["SecretProvider"]
+        }
+      ],
+      "dependencies": ["StatefulWidget", "SecretProvider"]
+    },
+    {
+      "class_name": "PinInputWidget",
+      "purpose": "Custom PIN entry widget with numeric keypad and visual feedback",
+      "methods": [
+        {
+          "method_name": "build",
+          "purpose": "Build PIN input interface with keypad and dot indicators",
+          "contract": {
+            "inputs": ["context: BuildContext"],
+            "outputs": ["Widget"],
+            "preconditions": [],
+            "postconditions": ["Returns PIN input widget with keypad"]
+          },
+          "dependencies": []
+        },
+        {
+          "method_name": "_onKeyPressed",
+          "purpose": "Handle keypad input and PIN validation",
+          "contract": {
+            "inputs": ["key: String"],
+            "outputs": ["void"],
+            "preconditions": ["key is valid input"],
+            "postconditions": ["PIN updated", "Callbacks triggered if applicable"]
+          },
+          "dependencies": []
+        }
+      ],
+      "dependencies": ["StatefulWidget"]
+    },
+    {
+      "class_name": "ShareCardWidget",
+      "purpose": "Expandable card widget for displaying share information with copy and share actions",
+      "methods": [
+        {
+          "method_name": "build",
+          "purpose": "Build expandable share card with actions",
+          "contract": {
+            "inputs": ["context: BuildContext"],
+            "outputs": ["Widget"],
+            "preconditions": ["package contains valid share data"],
+            "postconditions": ["Returns expandable card with share details and actions"]
+          },
+          "dependencies": ["ParticipantPackage"]
+        }
+      ],
+      "dependencies": ["StatelessWidget", "ParticipantPackage"]
+    },
+    {
+      "class_name": "AppTheme",
+      "purpose": "Material Design 3 theme configuration with light and dark mode support",
+      "methods": [
+        {
+          "method_name": "lightTheme",
+          "purpose": "Generate light theme with Material 3 color scheme",
+          "contract": {
+            "inputs": [],
+            "outputs": ["ThemeData"],
+            "preconditions": [],
+            "postconditions": ["Returns configured light theme"]
+          },
+          "dependencies": ["ColorScheme.fromSeed"]
+        },
+        {
+          "method_name": "darkTheme",
+          "purpose": "Generate dark theme with Material 3 color scheme",
+          "contract": {
+            "inputs": [],
+            "outputs": ["ThemeData"],
+            "preconditions": [],
+            "postconditions": ["Returns configured dark theme"]
+          },
+          "dependencies": ["ColorScheme.fromSeed"]
+        }
+      ],
+      "dependencies": ["ThemeData", "ColorScheme"]
+    }
+  ]
+}
