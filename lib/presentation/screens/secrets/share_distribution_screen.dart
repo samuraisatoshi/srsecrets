@@ -13,16 +13,23 @@ class ShareDistributionScreen extends StatefulWidget {
 }
 
 class _ShareDistributionScreenState extends State<ShareDistributionScreen> {
+  bool _isRetrying = false;
+  
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final secretProvider = context.watch<SecretProvider>();
     final packages = secretProvider.getDistributionPackages();
     
-    // Debug logging to help identify the issue
-    if (packages.isEmpty && secretProvider.lastResult != null) {
-      print('WARNING: lastResult exists but packages are empty');
-      print('ShareSets count: ${secretProvider.lastResult?.shareSets.length}');
+    // Enhanced debugging and error detection
+    if (packages.isEmpty) {
+      if (secretProvider.lastResult != null) {
+        print('WARNING: lastResult exists but packages are empty');
+        print('ShareSets count: ${secretProvider.lastResult?.shareSets.length}');
+        print('Secret ready status: ${secretProvider.isSecretReady}');
+      } else {
+        print('ERROR: No lastResult available in ShareDistributionScreen');
+      }
     }
 
     return Scaffold(
@@ -54,15 +61,28 @@ class _ShareDistributionScreenState extends State<ShareDistributionScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    secretProvider.lastResult == null
-                        ? 'No secret has been generated. Please go back and create a secret.'
-                        : 'Error: Shares were generated but cannot be displayed.',
+                    _getErrorMessage(secretProvider),
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 24),
+                  // Enhanced error recovery options
+                  if (secretProvider.lastResult != null) ...[
+                    ElevatedButton.icon(
+                      onPressed: _isRetrying ? null : () => _retryPackageGeneration(secretProvider),
+                      icon: _isRetrying 
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.refresh),
+                      label: Text(_isRetrying ? 'Retrying...' : 'Retry'),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                   ElevatedButton.icon(
                     onPressed: () => Navigator.of(context).pop(),
                     icon: const Icon(Icons.arrow_back),
@@ -234,6 +254,59 @@ Keep this share secure. You need ${package.threshold} shares to reconstruct the 
         duration: Duration(seconds: 2),
       ),
     );
+  }
+
+  String _getErrorMessage(secretProvider) {
+    if (secretProvider.lastResult == null) {
+      return 'No secret has been generated. Please go back and create a secret first.';
+    } else if (secretProvider.errorMessage != null) {
+      return 'Error: ${secretProvider.errorMessage}';
+    } else {
+      return 'The secret was generated but shares cannot be displayed. This may be a temporary issue - try the retry button.';
+    }
+  }
+  
+  Future<void> _retryPackageGeneration(secretProvider) async {
+    if (_isRetrying) return;
+    
+    setState(() {
+      _isRetrying = true;
+    });
+    
+    try {
+      // Clear any existing error
+      secretProvider.clearError();
+      
+      // Force a state update
+      await Future.delayed(const Duration(milliseconds: 100));
+      
+      // Trigger a rebuild by calling getDistributionPackages again
+      final packages = secretProvider.getDistributionPackages();
+      
+      if (packages.isNotEmpty && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Successfully recovered share packages!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Retry failed: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isRetrying = false;
+        });
+      }
+    }
   }
 
   void _showHelpDialog(BuildContext context) {

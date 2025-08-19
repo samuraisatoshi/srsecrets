@@ -323,24 +323,76 @@ class _CreateSecretScreenState extends State<CreateSecretScreen> {
     }
 
     final secretProvider = context.read<SecretProvider>();
-    final success = await secretProvider.createSecret(
-      secretName: _nameController.text.trim(),
-      secret: _secretController.text.trim(),
-      threshold: int.parse(_thresholdController.text),
-      totalShares: int.parse(_totalSharesController.text),
-    );
-
-    if (success && mounted) {
-      // Clear form
-      _nameController.clear();
-      _secretController.clear();
-      
-      // Navigate to share distribution screen
-      Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (context) => const ShareDistributionScreen(),
-        ),
+    
+    try {
+      final success = await secretProvider.createSecret(
+        secretName: _nameController.text.trim(),
+        secret: _secretController.text.trim(),
+        threshold: int.parse(_thresholdController.text),
+        totalShares: int.parse(_totalSharesController.text),
       );
+
+      if (!mounted) return;
+      
+      if (success) {
+        // Validate that the secret is actually ready before navigation
+        if (!secretProvider.isSecretReady) {
+          // Show error if secret creation succeeded but state is not ready
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Secret created but distribution packages could not be prepared. Please try again.'),
+                backgroundColor: Colors.orange,
+              ),
+            );
+          }
+          return;
+        }
+        
+        // Clear form only after successful validation
+        _nameController.clear();
+        _secretController.clear();
+        
+        // Navigate with additional validation
+        if (mounted) {
+          final result = await Navigator.of(context).push<bool>(
+            MaterialPageRoute(
+              builder: (context) => const ShareDistributionScreen(),
+            ),
+          );
+          
+          // Optional: Handle return from distribution screen
+          if (result == true && mounted) {
+            // User completed distribution, could show success message
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Secret shares distributed successfully!'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          }
+        }
+      } else {
+        // Show error message if creation failed
+        if (mounted && secretProvider.errorMessage != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(secretProvider.errorMessage!),
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      // Handle any unexpected errors
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Unexpected error: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+      }
     }
   }
 }

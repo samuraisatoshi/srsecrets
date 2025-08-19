@@ -44,7 +44,7 @@ class SecretProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Create secret shares
+  // Create secret shares with enhanced state validation
   Future<bool> createSecret({
     required String secretName,
     required String secret,
@@ -55,20 +55,51 @@ class SecretProvider extends ChangeNotifier {
     _clearError();
 
     try {
+      // Input validation
+      if (secretName.trim().isEmpty) {
+        _setError('Secret name cannot be empty');
+        _setLoading(false);
+        return false;
+      }
+      
+      if (secret.trim().isEmpty) {
+        _setError('Secret cannot be empty');
+        _setLoading(false);
+        return false;
+      }
+      
+      // Clear any previous results to avoid stale state
+      _lastResult = null;
+      
       final result = ShamirSecretSharing.splitString(
         secret: secret,
         threshold: threshold,
         shares: totalShares,
       );
 
-      _lastResult = result;
-      
-      // Verify the result was created successfully
+      // Validate result before setting
       if (result.shareSets.isEmpty) {
-        _setError('Failed to generate shares');
+        _setError('Failed to generate shares: No share sets created');
         _setLoading(false);
         return false;
       }
+      
+      // Double-check that distribution packages can be created
+      try {
+        final testPackages = result.createDistributionPackages();
+        if (testPackages.isEmpty) {
+          _setError('Failed to create distribution packages');
+          _setLoading(false);
+          return false;
+        }
+      } catch (e) {
+        _setError('Failed to validate distribution packages: $e');
+        _setLoading(false);
+        return false;
+      }
+      
+      // Set result only after validation
+      _lastResult = result;
       
       // Create secret info for local storage
       final secretInfo = SecretInfo(
@@ -82,10 +113,13 @@ class SecretProvider extends ChangeNotifier {
 
       _secrets.add(secretInfo);
       
-      // Ensure listeners are notified before navigation
+      // Force immediate state update with explicit notification
+      _setLoading(false);
       notifyListeners();
       
-      _setLoading(false);
+      // Small delay to ensure UI state is updated
+      await Future.delayed(const Duration(milliseconds: 10));
+      
       return true;
     } catch (e) {
       _setError('Failed to create secret shares: $e');
@@ -144,10 +178,38 @@ class SecretProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Get distribution packages for sharing
+  // Get distribution packages for sharing with enhanced error handling
   List<ParticipantPackage> getDistributionPackages() {
-    if (_lastResult == null) return [];
-    return _lastResult!.createDistributionPackages();
+    if (_lastResult == null) {
+      print('WARNING: getDistributionPackages called with null _lastResult');
+      return [];
+    }
+    
+    try {
+      final packages = _lastResult!.createDistributionPackages();
+      if (packages.isEmpty) {
+        print('WARNING: createDistributionPackages returned empty list');
+        print('ShareSets count: ${_lastResult!.shareSets.length}');
+      }
+      return packages;
+    } catch (e) {
+      print('ERROR: Failed to create distribution packages: $e');
+      _setError('Failed to create distribution packages: $e');
+      return [];
+    }
+  }
+  
+  // Validate that secret creation completed successfully
+  bool get isSecretReady {
+    if (_lastResult == null) return false;
+    if (_lastResult!.shareSets.isEmpty) return false;
+    
+    try {
+      final packages = _lastResult!.createDistributionPackages();
+      return packages.isNotEmpty;
+    } catch (e) {
+      return false;
+    }
   }
 
   // Private helper methods
