@@ -1,0 +1,40 @@
+{
+  "domain_name": "onboarding",
+  "purpose": "Manages user onboarding experience, tutorial systems, and first-time user education",
+  "classes": [
+    {
+      "class_name": "OnboardingIntegrationService",
+      "purpose": "Central service for integrating onboarding system with main app flow",
+      "methods": [
+        {
+          "method_name": "validateOnboardingSystem",
+          "purpose": "Validates that all onboarding components are properly available",
+          "contract": {
+            "inputs": [],
+            "outputs": ["bool"],
+            "preconditions": ["App is initialized"],
+            "postconditions": ["Returns true if all components are valid"]
+          },
+          "dependencies": []
+        },
+        {
+          "method_name": "determineInitialRoute",
+          "purpose": "Determines which screen to show based on user state",
+          "contract": {
+            "inputs": [
+              "bool isAuthenticated",
+              "bool isPinSet", 
+              "bool isOnboardingCompleted",
+              "bool isFirstLaunch"
+            ],
+            "outputs": ["Widget"],
+            "preconditions": ["Provider states are properly initialized"],
+            "postconditions": ["Returns appropriate screen widget"]
+          },
+          "dependencies": ["AuthProvider", "OnboardingProvider"]
+        }
+      ],
+      "dependencies": ["Flutter framework", "Provider pattern"]
+    }
+  ]
+}

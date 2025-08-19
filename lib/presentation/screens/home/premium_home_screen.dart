@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
-import '../../providers/secret_provider.dart';
-import '../../widgets/premium_security_card.dart';
+import '../../providers/onboarding_provider.dart';
 import '../../theme/premium_theme.dart';
 import '../secrets/secrets_list_screen.dart';
 import '../secrets/create_secret_screen.dart';
 import '../secrets/reconstruct_secret_screen.dart';
+import '../onboarding/onboarding_flow_screen.dart';
 
 /// Premium home screen with Trezor/Ledger-inspired design
 class PremiumHomeScreen extends StatefulWidget {
@@ -65,9 +65,8 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     
-    return ChangeNotifierProvider(
-      create: (context) => SecretProvider(),
-      child: LayoutBuilder(
+    // Remove the local ChangeNotifierProvider - use the app-level provider instead
+    return LayoutBuilder(
         builder: (context, constraints) {
           final isTablet = constraints.maxWidth >= 600;
           final isDesktop = constraints.maxWidth >= 840;
@@ -108,7 +107,6 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                 isTablet ? null : _buildPremiumBottomNav(context, isDark),
           );
         },
-      ),
     );
   }
 
@@ -695,6 +693,22 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                   child: ElevatedButton.icon(
                     onPressed: () {
                       Navigator.of(context).pop();
+                      _showOnboardingAgain(context);
+                    },
+                    icon: const Icon(Icons.school),
+                    label: const Text('View Onboarding'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: theme.colorScheme.primary,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).pop();
                       _showLogoutConfirmation(context);
                     },
                     icon: const Icon(Icons.logout),
@@ -799,6 +813,16 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
           ),
         );
       },
+    );
+  }
+
+  void _showOnboardingAgain(BuildContext context) {
+    final onboardingProvider = context.read<OnboardingProvider>();
+    onboardingProvider.resetOnboardingState();
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const OnboardingFlowScreen(),
+      ),
     );
   }
 }
