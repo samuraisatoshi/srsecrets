@@ -1,6 +1,12 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../../providers/auth_provider.dart';
+import '../../providers/onboarding_provider.dart';
 import '../../theme/premium_theme.dart';
+import '../auth/premium_pin_setup_screen.dart';
+import '../auth/premium_pin_login_screen.dart';
+import '../home/premium_home_screen.dart';
 
 /// Fullscreen visual onboarding with hero animations
 /// Educates users about Shamir's Secret Sharing in 4 compelling screens
@@ -135,11 +141,65 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   }
 
   void _completeOnboarding() {
-    Navigator.of(context).pushReplacementNamed('/pin-setup');
+    final onboardingProvider = context.read<OnboardingProvider>();
+    final authProvider = context.read<AuthProvider>();
+    
+    onboardingProvider.completeOnboarding();
+    
+    // Navigate based on auth status
+    if (authProvider.isPinSet && authProvider.isAuthenticated) {
+      // User already has PIN and is authenticated, return to home
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (context) => const PremiumHomeScreen(),
+        ),
+      );
+    } else if (authProvider.isPinSet) {
+      // PIN is set but not authenticated, go to login
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (context) => const PremiumPinLoginScreen(),
+        ),
+      );
+    } else {
+      // No PIN set, go to PIN setup
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (context) => const PremiumPinSetupScreen(),
+        ),
+      );
+    }
   }
 
   void _skipOnboarding() {
-    Navigator.of(context).pushReplacementNamed('/pin-setup');
+    final onboardingProvider = context.read<OnboardingProvider>();
+    final authProvider = context.read<AuthProvider>();
+    
+    onboardingProvider.skipOnboarding();
+    
+    // Navigate based on auth status  
+    if (authProvider.isPinSet && authProvider.isAuthenticated) {
+      // User already has PIN and is authenticated, return to home
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (context) => const PremiumHomeScreen(),
+        ),
+      );
+    } else if (authProvider.isPinSet) {
+      // PIN is set but not authenticated, go to login
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (context) => const PremiumPinLoginScreen(),
+        ),
+      );
+    } else {
+      // No PIN set, go to PIN setup
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (context) => const PremiumPinSetupScreen(),
+        ),
+      );
+    }
   }
 
   @override
@@ -167,36 +227,43 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             end: Alignment.bottomCenter,
           ),
         ),
-        child: Stack(
+        child: Column(
           children: [
-            // Animated background particles
-            _buildAnimatedBackground(isDark, size),
+            // Top navigation bar (fixed position)
+            _buildTopNavigationBar(context, isDark),
             
-            // Main content
-            PageView.builder(
-              controller: _pageController,
-              onPageChanged: (index) {
-                setState(() {
-                  _currentPage = index;
-                });
-                _restartAnimations();
-              },
-              itemCount: _onboardingPages.length,
-              itemBuilder: (context, index) {
-                return _buildOnboardingPage(
-                  context,
-                  _onboardingPages[index],
-                  isDark,
-                  size,
-                );
-              },
+            // Main content (expandable)
+            Expanded(
+              child: Stack(
+                children: [
+                  // Animated background particles
+                  _buildAnimatedBackground(isDark, size),
+                  
+                  // Main content pages
+                  PageView.builder(
+                    controller: _pageController,
+                    onPageChanged: (index) {
+                      setState(() {
+                        _currentPage = index;
+                      });
+                      _restartAnimations();
+                    },
+                    itemCount: _onboardingPages.length,
+                    itemBuilder: (context, index) {
+                      return _buildOnboardingPage(
+                        context,
+                        _onboardingPages[index],
+                        isDark,
+                        size,
+                      );
+                    },
+                  ),
+                ],
+              ),
             ),
             
-            // Top navigation bar
-            _buildTopNavigation(context, isDark),
-            
-            // Bottom navigation
-            _buildBottomNavigation(context, isDark),
+            // Bottom navigation toolbar (fixed position)
+            _buildBottomNavigationToolbar(context, isDark),
           ],
         ),
       ),
@@ -219,12 +286,12 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     );
   }
 
-  Widget _buildTopNavigation(BuildContext context, bool isDark) {
+  Widget _buildTopNavigationBar(BuildContext context, bool isDark) {
     final theme = Theme.of(context);
     
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
@@ -296,27 +363,34 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   ) {
     final theme = Theme.of(context);
     
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24),
-        child: Column(
-          children: [
-            const SizedBox(height: 80), // Space for top navigation
-            
-            // Hero section with animated icon
-            Expanded(
-              flex: 3,
-              child: _buildHeroSection(data, theme, isDark, size),
-            ),
-            
-            // Content section
-            Expanded(
-              flex: 2,
-              child: _buildContentSection(data, theme, isDark),
-            ),
-            
-            const SizedBox(height: 100), // Space for bottom navigation
-          ],
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: SingleChildScrollView(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            minHeight: MediaQuery.of(context).size.height - 
+                       MediaQuery.of(context).padding.top - 
+                       MediaQuery.of(context).padding.bottom - 
+                       120, // Account for top and bottom toolbars
+          ),
+          child: Column(
+            children: [
+              const SizedBox(height: 20), // Minimal space for top navigation
+              
+              // Hero section with animated icon
+              SizedBox(
+                height: 300,
+                child: _buildHeroSection(data, theme, isDark, size),
+              ),
+              
+              const SizedBox(height: 24),
+              
+              // Content section
+              _buildContentSection(data, theme, isDark),
+              
+              const SizedBox(height: 20), // Minimal space for bottom navigation
+            ],
+          ),
         ),
       ),
     );
@@ -858,60 +932,83 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     );
   }
 
-  Widget _buildBottomNavigation(BuildContext context, bool isDark) {
+  Widget _buildBottomNavigationToolbar(BuildContext context, bool isDark) {
     final theme = Theme.of(context);
     
-    return Positioned(
-      bottom: 0,
-      left: 0,
-      right: 0,
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      decoration: BoxDecoration(
+        color: isDark
+            ? const Color(0xFF141824).withValues(alpha: 0.95)
+            : Colors.white.withValues(alpha: 0.95),
+        border: Border(
+          top: BorderSide(
+            color: theme.colorScheme.outline.withValues(alpha: 0.1),
+            width: 1,
+          ),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.1),
+            blurRadius: 10,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
       child: SafeArea(
-        child: Container(
-          padding: const EdgeInsets.all(24),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              // Previous button
-              if (_currentPage > 0)
-                OutlinedButton.icon(
+        top: false,
+        child: Row(
+          children: [
+            // Back button (left side)
+            if (_currentPage > 0)
+              Expanded(
+                child: OutlinedButton.icon(
                   onPressed: _previousPage,
-                  icon: const Icon(Icons.arrow_back),
+                  icon: const Icon(Icons.arrow_back, size: 18),
                   label: const Text('Back'),
                   style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
                     side: BorderSide(
-                      color: theme.colorScheme.outline.withValues(alpha: 0.5),
+                      color: theme.colorScheme.outline.withValues(alpha: 0.3),
                     ),
                     shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+                      borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                )
-              else
-                const SizedBox(width: 100), // Placeholder for alignment
-              
-              // Next/Get Started button
-              ElevatedButton.icon(
+                ),
+              )
+            else
+              const Expanded(child: SizedBox()),
+            
+            const SizedBox(width: 12),
+            
+            const SizedBox(width: 12),
+            
+            // Next button (right side)
+            Expanded(
+              child: ElevatedButton.icon(
                 onPressed: _nextPage,
-                icon: Icon(_currentPage == _onboardingPages.length - 1
-                    ? Icons.rocket_launch
-                    : Icons.arrow_forward),
-                label: Text(_currentPage == _onboardingPages.length - 1
-                    ? 'Get Started'
-                    : 'Next'),
+                icon: const Icon(Icons.arrow_forward, size: 18),
+                label: const Text(
+                  'Next',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
                 style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 18),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
                   backgroundColor: _onboardingPages[_currentPage].accentColor,
                   foregroundColor: Colors.white,
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  elevation: 8,
+                  elevation: 3,
                   shadowColor: _onboardingPages[_currentPage].accentColor.withValues(alpha: 0.3),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

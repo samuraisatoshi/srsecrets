@@ -3,10 +3,9 @@ import 'package:provider/provider.dart';
 
 import 'presentation/providers/auth_provider.dart';
 import 'presentation/providers/secret_provider.dart';
-import 'presentation/screens/auth/premium_pin_setup_screen.dart';
-import 'presentation/screens/auth/premium_pin_login_screen.dart';
-import 'presentation/screens/home/premium_home_screen.dart';
+import 'presentation/providers/onboarding_provider.dart';
 import 'presentation/theme/premium_theme.dart';
+import 'core/routing/app_router.dart';
 
 void main() {
   runApp(const SRSecretsApp());
@@ -24,6 +23,9 @@ class SRSecretsApp extends StatelessWidget {
         ),
         ChangeNotifierProvider(
           create: (context) => SecretProvider(),
+        ),
+        ChangeNotifierProvider(
+          create: (context) => OnboardingProvider(),
         ),
       ],
       child: MaterialApp(
@@ -49,16 +51,18 @@ class _AuthWrapperState extends State<AuthWrapper> {
   @override
   void initState() {
     super.initState();
-    // Check authentication status on app start
+    // Initialize providers on app start
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<AuthProvider>().checkAuthStatus();
+      context.read<OnboardingProvider>().initialize();
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<AuthProvider>(
-      builder: (context, authProvider, child) {
+    return Consumer2<AuthProvider, OnboardingProvider>(
+      builder: (context, authProvider, onboardingProvider, child) {
+        // Show loading while providers initialize
         if (authProvider.isLoading) {
           return const Scaffold(
             body: Center(
@@ -67,15 +71,20 @@ class _AuthWrapperState extends State<AuthWrapper> {
           );
         }
 
-        if (!authProvider.isPinSet) {
-          return const PremiumPinSetupScreen();
+        // Validate route components
+        if (!AppRouter.validateRouteComponents()) {
+          return AppRouter.createErrorScreen(
+            'Application components validation failed. Please restart the app.',
+          );
         }
 
-        if (!authProvider.isAuthenticated) {
-          return const PremiumPinLoginScreen();
-        }
-
-        return const PremiumHomeScreen();
+        // Use router to determine initial route
+        return AppRouter.determineInitialRoute(
+          isAuthenticated: authProvider.isAuthenticated,
+          isPinSet: authProvider.isPinSet,
+          isOnboardingCompleted: onboardingProvider.isOnboardingCompleted,
+          isFirstLaunch: onboardingProvider.isFirstLaunch,
+        );
       },
     );
   }

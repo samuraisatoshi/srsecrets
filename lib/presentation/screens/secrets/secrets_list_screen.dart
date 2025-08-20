@@ -242,9 +242,9 @@ class SecretsListScreen extends StatelessWidget {
             child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.of(context).pop();
-              context.read<SecretProvider>().removeSecret(secret.id);
+              await context.read<SecretProvider>().removeSecret(secret.id);
             },
             style: TextButton.styleFrom(
               foregroundColor: Theme.of(context).colorScheme.error,

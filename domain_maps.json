@@ -14,6 +14,11 @@
       "name": "presentation",
       "purpose": "Provides Flutter UI components, state management, and user interaction layer for secure cryptographic operations with Material Design 3 theming and responsive layouts",
       "map_path": "lib/presentation/map.json"
+    },
+    {
+      "name": "onboarding",
+      "purpose": "Manages user onboarding experience, educational tutorials, and first-time user guidance with interactive learning systems and progress tracking",
+      "map_path": "lib/domains/onboarding/map.json"
     }
   ]
 }

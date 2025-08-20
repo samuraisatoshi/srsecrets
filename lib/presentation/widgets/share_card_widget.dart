@@ -73,7 +73,7 @@ class ShareCardWidget extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       SelectableText(
-                        package.shareSet.toJson(),
+                        package.shareSet.toBase64(),
                         style: theme.textTheme.bodySmall?.copyWith(
                           fontFamily: 'monospace',
                           color: theme.colorScheme.onSurface.withValues(alpha: 0.7),

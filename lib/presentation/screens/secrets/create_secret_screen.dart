@@ -317,7 +317,7 @@ class _CreateSecretScreenState extends State<CreateSecretScreen> {
     );
   }
 
-  Future<void> _createSecret() async {
+  void _createSecret() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -335,13 +335,12 @@ class _CreateSecretScreenState extends State<CreateSecretScreen> {
       if (!mounted) return;
       
       if (success) {
-        // Validate that the secret is actually ready before navigation
+        // Validate that the secret is ready
         if (!secretProvider.isSecretReady) {
-          // Show error if secret creation succeeded but state is not ready
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('Secret created but distribution packages could not be prepared. Please try again.'),
+                content: Text('Failed to prepare secret shares. Please try again.'),
                 backgroundColor: Colors.orange,
               ),
             );
@@ -355,22 +354,11 @@ class _CreateSecretScreenState extends State<CreateSecretScreen> {
         
         // Navigate with additional validation
         if (mounted) {
-          final result = await Navigator.of(context).push<bool>(
+          Navigator.of(context).push<bool>(
             MaterialPageRoute(
               builder: (context) => const ShareDistributionScreen(),
             ),
           );
-          
-          // Optional: Handle return from distribution screen
-          if (result == true && mounted) {
-            // User completed distribution, could show success message
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Secret shares distributed successfully!'),
-                backgroundColor: Colors.green,
-              ),
-            );
-          }
         }
       } else {
         // Show error message if creation failed

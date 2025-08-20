@@ -1,0 +1,42 @@
+SRSecrets Cryptographic Performance Benchmark Report
+Generated: 2025-08-18 23:30:56.173671
+Platform: macos Version 15.5 (Build 24F74)
+
+
+GF256 Field Operations:
+  Addition:         0.002μs
+  Multiplication:   0.003μs
+  Division:         0.014μs
+  Power:            0.118μs
+  Interpolation:    0.001ms
+
+Random Number Generation:
+  Byte Generation:  33.950μs
+  GF256 Element:    30.573μs
+  Bytes Array(32):  987.219μs
+
+Polynomial Operations:
+  Generation:       121.865μs
+  Evaluation:       0.033μs
+  Eval Points(100): 3.905ms
+
+Share Operations:
+  Generation(10):   0.439ms
+  Large Gen(255):   0.054s
+  Serialization:    2.293μs
+  ShareSet(32b):    14.262ms
+
+End-to-End Performance:
+  Single Byte:      0.295ms
+  Multi-Byte(64b):  42.579ms
+  String Secret:    22.141ms
+
+Memory Usage:
+  Peak Memory:      1.00MB
+
+Performance Status: 
+  All Targets Met:  ✅ PASS
+
+
+Raw Data:
+{gf256_addition_avg_microseconds: 0.001941, gf256_multiplication_avg_microseconds: 0.002861, gf256_division_avg_microseconds: 0.01397, gf256_power_avg_microseconds: 0.1181, gf256_interpolation_avg_milliseconds: 0.0013440000000000001, secure_random_byte_avg_microseconds: 33.94962, secure_random_gf256_avg_microseconds: 30.57306, secure_random_bytes_avg_microseconds: 987.2191, polynomial_generation_avg_microseconds: 121.8648, polynomial_evaluation_avg_microseconds: 0.03286, evaluation_points_avg_milliseconds: 3.9051060000000004, share_generation_avg_milliseconds: 0.438938, large_share_generation_avg_seconds: 0.0544, share_serialization_avg_microseconds: 2.2933, shareset_generation_avg_milliseconds: 14.26192, e2e_single_byte_avg_milliseconds: 0.295223, e2e_multi_byte_avg_milliseconds: 42.579440000000005, e2e_string_avg_milliseconds: 22.141099999999998, peak_memory_mb: 1.0}

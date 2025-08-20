@@ -2,7 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../theme/premium_theme.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/onboarding_provider.dart';
+import '../auth/premium_pin_setup_screen.dart';
+import '../auth/premium_pin_login_screen.dart';
+import '../home/premium_home_screen.dart';
 import 'onboarding_screen.dart';
 import 'use_cases_screen.dart';
 import 'security_guide_screen.dart';
@@ -120,7 +124,33 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen>
 
   void _skipOnboarding() {
     final onboardingProvider = context.read<OnboardingProvider>();
+    final authProvider = context.read<AuthProvider>();
+    
     onboardingProvider.skipOnboarding();
+    
+    // Navigate based on auth status  
+    if (authProvider.isPinSet && authProvider.isAuthenticated) {
+      // User already has PIN and is authenticated, return to home
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (context) => const PremiumHomeScreen(),
+        ),
+      );
+    } else if (authProvider.isPinSet) {
+      // PIN is set but not authenticated, go to login
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (context) => const PremiumPinLoginScreen(),
+        ),
+      );
+    } else {
+      // No PIN set, go to PIN setup
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (context) => const PremiumPinSetupScreen(),
+        ),
+      );
+    }
   }
 
   void _completeOnboarding() {
@@ -128,7 +158,33 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen>
     _markCurrentSectionComplete();
     
     final onboardingProvider = context.read<OnboardingProvider>();
+    final authProvider = context.read<AuthProvider>();
+    
     onboardingProvider.completeOnboarding();
+    
+    // Navigate based on auth status
+    if (authProvider.isPinSet && authProvider.isAuthenticated) {
+      // User already has PIN and is authenticated, return to home
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (context) => const PremiumHomeScreen(),
+        ),
+      );
+    } else if (authProvider.isPinSet) {
+      // PIN is set but not authenticated, go to login
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (context) => const PremiumPinLoginScreen(),
+        ),
+      );
+    } else {
+      // No PIN set, go to PIN setup
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (context) => const PremiumPinSetupScreen(),
+        ),
+      );
+    }
   }
 
   @override
@@ -163,8 +219,8 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen>
           // Desktop/tablet navigation sidebar
           if (isTablet) _buildTabletSidebar(theme, isDark),
           
-          // Floating action buttons
-          if (_showFloatingActions && !isTablet) _buildFloatingActions(theme, isDark),
+          // Floating action buttons - disabled to prevent content blocking
+          // if (_showFloatingActions && !isTablet) _buildFloatingActions(theme, isDark),
         ],
       ),
     );
@@ -180,8 +236,8 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen>
             opacity: _transitionController.value,
             child: SafeArea(
               child: Container(
-                margin: const EdgeInsets.all(16),
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 decoration: BoxDecoration(
                   color: isDark
                       ? Colors.black.withValues(alpha: 0.8)
@@ -201,7 +257,7 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen>
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    // Progress indicators
+                    // Flow navigation buttons (clickable progress indicators)
                     Row(
                       children: _onboardingFlows.asMap().entries.map((entry) {
                         final index = entry.key;
@@ -209,24 +265,37 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen>
                         final isActive = index == _currentMainIndex;
                         
                         return Container(
-                          margin: const EdgeInsets.only(right: 8),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 300),
-                            width: isActive ? 32 : 8,
-                            height: 8,
-                            decoration: BoxDecoration(
-                              gradient: isActive
-                                  ? LinearGradient(
-                                      colors: [
-                                        flow.color,
-                                        flow.color.withValues(alpha: 0.7),
-                                      ],
-                                    )
-                                  : null,
-                              color: !isActive
-                                  ? theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3)
-                                  : null,
-                              borderRadius: BorderRadius.circular(4),
+                          margin: const EdgeInsets.only(right: 4),
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: () => _navigateToFlow(index),
+                              borderRadius: BorderRadius.circular(16),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      flow.icon,
+                                      size: 16,
+                                      color: isActive ? flow.color : theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                                    ),
+                                    if (isActive) ...[
+                                      const SizedBox(width: 4),
+                                      AnimatedContainer(
+                                        duration: const Duration(milliseconds: 300),
+                                        width: 6,
+                                        height: 6,
+                                        decoration: BoxDecoration(
+                                          color: flow.color,
+                                          shape: BoxShape.circle,
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
                             ),
                           ),
                         );

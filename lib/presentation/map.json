@@ -73,9 +73,9 @@
           "purpose": "Split secret into shares using Shamir's Secret Sharing",
           "contract": {
             "inputs": ["secretName: String", "secret: String", "threshold: int", "totalShares: int"],
-            "outputs": ["Future<bool>"],
-            "preconditions": ["secret not empty", "threshold >= 2", "totalShares >= threshold"],
-            "postconditions": ["Secret split into shares", "Distribution packages created", "Local secret info stored"]
+            "outputs": ["bool"],
+            "preconditions": ["secretName not empty", "secret not empty", "threshold >= 2", "totalShares >= threshold"],
+            "postconditions": ["Secret split into shares", "Distribution packages validated and created", "Local secret info stored", "State immediately available"]
           },
           "dependencies": ["ShamirSecretSharing.splitString", "SecretInfo"]
         },
@@ -84,7 +84,7 @@
           "purpose": "Reconstruct original secret from provided shares",
           "contract": {
             "inputs": ["shareStrings: List<String>"],
-            "outputs": ["Future<bool>"],
+            "outputs": ["bool"],
             "preconditions": ["shareStrings contains valid shares", "sufficient shares provided"],
             "postconditions": ["Original secret reconstructed", "Result stored in provider state"]
           },
@@ -98,6 +98,28 @@
             "outputs": ["List<ParticipantPackage>"],
             "preconditions": ["secret has been split (lastResult exists)"],
             "postconditions": ["Returns packages ready for distribution"]
+          },
+          "dependencies": ["MultiSplitResult.createDistributionPackages"]
+        },
+        {
+          "method_name": "getSafeDistributionPackages",
+          "purpose": "Get participant packages with cached state protection to avoid race conditions",
+          "contract": {
+            "inputs": [],
+            "outputs": ["List<ParticipantPackage>"],
+            "preconditions": [],
+            "postconditions": ["Returns cached packages or empty list if none available"]
+          },
+          "dependencies": ["MultiSplitResult.createDistributionPackages"]
+        },
+        {
+          "method_name": "isSecretReady",
+          "purpose": "Validate that secret creation completed successfully and packages are available",
+          "contract": {
+            "inputs": [],
+            "outputs": ["bool"],
+            "preconditions": [],
+            "postconditions": ["Returns true if lastResult exists and distribution packages can be created"]
           },
           "dependencies": ["MultiSplitResult.createDistributionPackages"]
         },
@@ -177,7 +199,7 @@
     },
     {
       "class_name": "CreateSecretScreen",
-      "purpose": "Interface for creating new secrets with Shamir parameters configuration",
+      "purpose": "Interface for creating new secrets with Shamir parameters configuration and race condition protection",
       "methods": [
         {
           "method_name": "build",
@@ -189,9 +211,20 @@
             "postconditions": ["Returns secret creation interface"]
           },
           "dependencies": ["SecretProvider"]
+        },
+        {
+          "method_name": "_createSecret",
+          "purpose": "Handle secret creation and navigation",
+          "contract": {
+            "inputs": [],
+            "outputs": ["void"],
+            "preconditions": ["Form is valid", "User input validated"],
+            "postconditions": ["Secret created", "Navigation occurs after state validation", "User feedback provided"]
+          },
+          "dependencies": ["SecretProvider.createSecret", "SecretProvider.isSecretReady", "Navigator"]
         }
       ],
-      "dependencies": ["StatefulWidget", "SecretProvider"]
+      "dependencies": ["StatefulWidget", "SecretProvider", "ShareDistributionScreen"]
     },
     {
       "class_name": "ReconstructSecretScreen",
@@ -247,6 +280,28 @@
             "postconditions": ["Package formatted and copied to clipboard"]
           },
           "dependencies": ["Clipboard", "ParticipantPackage"]
+        },
+        {
+          "method_name": "_retryPackageGeneration",
+          "purpose": "Retry package generation when initial load fails due to race conditions",
+          "contract": {
+            "inputs": ["secretProvider: SecretProvider"],
+            "outputs": ["Future<void>"],
+            "preconditions": ["secretProvider.lastResult exists"],
+            "postconditions": ["Packages refreshed", "User notified of success or failure"]
+          },
+          "dependencies": ["SecretProvider.getDistributionPackages"]
+        },
+        {
+          "method_name": "_getErrorMessage",
+          "purpose": "Generate contextual error messages based on provider state",
+          "contract": {
+            "inputs": ["secretProvider: SecretProvider"],
+            "outputs": ["String"],
+            "preconditions": [],
+            "postconditions": ["Returns appropriate error message for current state"]
+          },
+          "dependencies": ["SecretProvider"]
         }
       ],
       "dependencies": ["StatefulWidget", "ShareCardWidget", "SecretProvider", "Clipboard"]
@@ -344,6 +399,344 @@
         }
       ],
       "dependencies": ["ThemeData", "ColorScheme"]
+    },
+    {
+      "class_name": "OnboardingScreen",
+      "purpose": "Fullscreen visual onboarding with hero animations educating users about Shamir's Secret Sharing in 4 compelling screens",
+      "methods": [
+        {
+          "method_name": "build",
+          "purpose": "Build onboarding PageView with hero animations and visual comparisons",
+          "contract": {
+            "inputs": ["context: BuildContext"],
+            "outputs": ["Widget"],
+            "preconditions": [],
+            "postconditions": ["Returns interactive onboarding experience with animations"]
+          },
+          "dependencies": ["PageController", "AnimationController"]
+        },
+        {
+          "method_name": "_buildOnboardingPage",
+          "purpose": "Build individual onboarding page with hero section and content",
+          "contract": {
+            "inputs": ["context: BuildContext", "data: OnboardingData", "isDark: bool", "size: Size"],
+            "outputs": ["Widget"],
+            "preconditions": ["data contains valid onboarding information"],
+            "postconditions": ["Returns complete onboarding page with animations"]
+          },
+          "dependencies": ["OnboardingData"]
+        },
+        {
+          "method_name": "_buildVisualComparison",
+          "purpose": "Build interactive visual comparison based on current page",
+          "contract": {
+            "inputs": ["data: OnboardingData", "theme: ThemeData", "isDark: bool"],
+            "outputs": ["Widget"],
+            "preconditions": ["data contains valid comparison data"],
+            "postconditions": ["Returns appropriate visual comparison for current page"]
+          },
+          "dependencies": []
+        }
+      ],
+      "dependencies": ["StatefulWidget", "TickerProviderStateMixin", "PageController", "AnimationController", "OnboardingData", "ParticlesPainter"]
+    },
+    {
+      "class_name": "UseCasesScreen",
+      "purpose": "Business & Personal Use Case Visuals with Interactive Elements showcasing real-world scenarios where Shamir's Secret Sharing provides value",
+      "methods": [
+        {
+          "method_name": "build",
+          "purpose": "Build responsive use cases interface with category navigation",
+          "contract": {
+            "inputs": ["context: BuildContext"],
+            "outputs": ["Widget"],
+            "preconditions": [],
+            "postconditions": ["Returns interactive use cases exploration interface"]
+          },
+          "dependencies": ["UseCaseCategory", "UseCaseScenario"]
+        },
+        {
+          "method_name": "_buildInteractiveVisualization",
+          "purpose": "Build scenario-specific interactive visualizations",
+          "contract": {
+            "inputs": ["scenario: UseCaseScenario", "category: UseCaseCategory", "theme: ThemeData", "isDark: bool"],
+            "outputs": ["Widget"],
+            "preconditions": ["scenario and category contain valid data"],
+            "postconditions": ["Returns appropriate visualization based on scenario type"]
+          },
+          "dependencies": ["VisualType", "ConnectionLinesPainter"]
+        },
+        {
+          "method_name": "_selectCategory",
+          "purpose": "Handle category selection with animation reset",
+          "contract": {
+            "inputs": ["index: int"],
+            "outputs": ["void"],
+            "preconditions": ["index is valid category index"],
+            "postconditions": ["Category selected", "Animations restarted", "UI state updated"]
+          },
+          "dependencies": []
+        }
+      ],
+      "dependencies": ["StatefulWidget", "TickerProviderStateMixin", "AnimationController", "UseCaseCategory", "UseCaseScenario", "VisualType"]
+    },
+    {
+      "class_name": "SecurityGuideScreen",
+      "purpose": "Security Best Practices Guide with Interactive Visuals providing educational resource for secure storage and handling of secret shares",
+      "methods": [
+        {
+          "method_name": "build",
+          "purpose": "Build responsive security guide with practice recommendations",
+          "contract": {
+            "inputs": ["context: BuildContext"],
+            "outputs": ["Widget"],
+            "preconditions": [],
+            "postconditions": ["Returns interactive security practices guide"]
+          },
+          "dependencies": ["SecurityGuide", "SecurityPractice"]
+        },
+        {
+          "method_name": "_buildSecurityMeter",
+          "purpose": "Build animated security score meter with color-coded feedback",
+          "contract": {
+            "inputs": ["theme: ThemeData", "isDark: bool"],
+            "outputs": ["Widget"],
+            "preconditions": [],
+            "postconditions": ["Returns security meter with animated score display"]
+          },
+          "dependencies": []
+        },
+        {
+          "method_name": "_selectStorageOption",
+          "purpose": "Handle storage option selection and security scoring",
+          "contract": {
+            "inputs": ["practiceIndex: int"],
+            "outputs": ["void"],
+            "preconditions": ["practiceIndex is valid practice index"],
+            "postconditions": ["Practice selected", "Security score updated", "Animations triggered"]
+          },
+          "dependencies": []
+        }
+      ],
+      "dependencies": ["StatefulWidget", "TickerProviderStateMixin", "AnimationController", "SecurityGuide", "SecuritySection", "SecurityPractice", "RiskLevel"]
+    },
+    {
+      "class_name": "OnboardingFlowScreen",
+      "purpose": "Master onboarding flow combining visual education, use cases, and security guide providing comprehensive user education before entering main application",
+      "methods": [
+        {
+          "method_name": "build",
+          "purpose": "Build master onboarding flow with navigation between different education screens",
+          "contract": {
+            "inputs": ["context: BuildContext"],
+            "outputs": ["Widget"],
+            "preconditions": [],
+            "postconditions": ["Returns complete onboarding flow with navigation"]
+          },
+          "dependencies": ["OnboardingScreen", "UseCasesScreen", "SecurityGuideScreen"]
+        },
+        {
+          "method_name": "_navigateToFlow",
+          "purpose": "Navigate between different onboarding flows with animation",
+          "contract": {
+            "inputs": ["index: int"],
+            "outputs": ["void"],
+            "preconditions": ["index is valid flow index"],
+            "postconditions": ["Navigation completed", "Animations restarted", "Haptic feedback provided"]
+          },
+          "dependencies": ["PageController", "HapticFeedback"]
+        }
+      ],
+      "dependencies": ["StatefulWidget", "TickerProviderStateMixin", "PageController", "OnboardingFlow"]
+    },
+    {
+      "class_name": "OnboardingDemoScreen",
+      "purpose": "Demo screen showcasing the onboarding system features and capabilities to stakeholders",
+      "methods": [
+        {
+          "method_name": "build",
+          "purpose": "Build demonstration interface showcasing onboarding system features",
+          "contract": {
+            "inputs": ["context: BuildContext"],
+            "outputs": ["Widget"],
+            "preconditions": [],
+            "postconditions": ["Returns comprehensive demo interface with feature showcase"]
+          },
+          "dependencies": ["OnboardingFeature"]
+        },
+        {
+          "method_name": "_launchOnboarding",
+          "purpose": "Launch the full onboarding flow for demonstration",
+          "contract": {
+            "inputs": [],
+            "outputs": ["void"],
+            "preconditions": [],
+            "postconditions": ["Onboarding flow launched", "Navigation to OnboardingFlowScreen completed"]
+          },
+          "dependencies": ["OnboardingFlowScreen"]
+        }
+      ],
+      "dependencies": ["StatefulWidget", "TickerProviderStateMixin", "OnboardingFeature", "OnboardingFlowScreen"]
+    },
+    {
+      "class_name": "WireframeOverlaySystem",
+      "purpose": "Interactive wireframe overlay system providing white lines, tooltips, animated arrows, and progressive disclosure for UI guidance",
+      "methods": [
+        {
+          "method_name": "build",
+          "purpose": "Build wireframe overlay with interactive elements and navigation controls",
+          "contract": {
+            "inputs": ["context: BuildContext"],
+            "outputs": ["Widget"],
+            "preconditions": ["elements list contains valid WireframeElement objects"],
+            "postconditions": ["Returns overlay system with interactive guidance elements"]
+          },
+          "dependencies": ["WireframeElement", "WireframePainter"]
+        },
+        {
+          "method_name": "_calculateElementBounds",
+          "purpose": "Calculate screen positions for targeted UI elements",
+          "contract": {
+            "inputs": [],
+            "outputs": ["void"],
+            "preconditions": ["targetKey references exist in widget tree"],
+            "postconditions": ["Element bounds calculated and stored", "UI state updated"]
+          },
+          "dependencies": ["GlobalKey", "RenderBox"]
+        },
+        {
+          "method_name": "_nextElement",
+          "purpose": "Navigate to next wireframe element with animation",
+          "contract": {
+            "inputs": [],
+            "outputs": ["void"],
+            "preconditions": ["currentElementIndex < elements.length"],
+            "postconditions": ["Element index updated", "Animations restarted", "Haptic feedback triggered"]
+          },
+          "dependencies": ["HapticFeedback"]
+        }
+      ],
+      "dependencies": ["StatefulWidget", "TickerProviderStateMixin", "WireframeElement", "WireframePainter", "AnimationController"]
+    },
+    {
+      "class_name": "CryptoTutorialAnimations",
+      "purpose": "Interactive crypto tutorial animations with particle effects, drag-drop functionality, and visual demonstrations of Shamir's Secret Sharing concepts",
+      "methods": [
+        {
+          "method_name": "build",
+          "purpose": "Build animated tutorial interface based on tutorial type",
+          "contract": {
+            "inputs": ["context: BuildContext"],
+            "outputs": ["Widget"],
+            "preconditions": ["tutorialType is valid CryptoTutorialType"],
+            "postconditions": ["Returns interactive tutorial with animations and particle effects"]
+          },
+          "dependencies": ["CryptoTutorialType", "ParticleSystemPainter"]
+        },
+        {
+          "method_name": "_buildSecretSplittingAnimation",
+          "purpose": "Build animated demonstration of secret splitting process",
+          "contract": {
+            "inputs": [],
+            "outputs": ["Widget"],
+            "preconditions": [],
+            "postconditions": ["Returns splitting animation with visual transformation"]
+          },
+          "dependencies": ["DraggableShare"]
+        },
+        {
+          "method_name": "_onShareDragEnd",
+          "purpose": "Handle drag-and-drop completion for interactive reconstruction tutorial",
+          "contract": {
+            "inputs": ["share: DraggableShare", "globalPosition: Offset"],
+            "outputs": ["void"],
+            "preconditions": ["share is valid draggable object"],
+            "postconditions": ["Share placed in slot or returned to position", "Tutorial state updated", "Haptic feedback provided"]
+          },
+          "dependencies": ["ShareSlot", "HapticFeedback"]
+        }
+      ],
+      "dependencies": ["StatefulWidget", "TickerProviderStateMixin", "CryptoTutorialType", "DraggableShare", "ShareSlot", "ParticleSystemPainter"]
+    },
+    {
+      "class_name": "PracticeModeSystem",
+      "purpose": "Comprehensive practice mode with visual feedback, sample secrets, score tracking, and step-by-step guidance for hands-on learning",
+      "methods": [
+        {
+          "method_name": "build",
+          "purpose": "Build practice mode interface with current step content and feedback",
+          "contract": {
+            "inputs": ["context: BuildContext"],
+            "outputs": ["Widget"],
+            "preconditions": ["scenario is valid PracticeScenario"],
+            "postconditions": ["Returns complete practice interface with progress tracking"]
+          },
+          "dependencies": ["PracticeScenario", "SampleSecret", "FeedbackMessage"]
+        },
+        {
+          "method_name": "_validateUserInput",
+          "purpose": "Validate user input for current practice step and provide feedback",
+          "contract": {
+            "inputs": ["key: String", "value: dynamic"],
+            "outputs": ["void"],
+            "preconditions": ["key matches expected input type for current step"],
+            "postconditions": ["Input validated", "Feedback message added", "Score updated", "Step completion status determined"]
+          },
+          "dependencies": ["FeedbackType"]
+        },
+        {
+          "method_name": "_addFeedbackMessage",
+          "purpose": "Add feedback message with optional score change and visual animation",
+          "contract": {
+            "inputs": ["message: String", "type: FeedbackType", "scoreChange: int?"],
+            "outputs": ["void"],
+            "preconditions": ["message is not empty", "type is valid FeedbackType"],
+            "postconditions": ["Feedback added to history", "Score updated if provided", "Animation triggered"]
+          },
+          "dependencies": ["FeedbackMessage"]
+        }
+      ],
+      "dependencies": ["StatefulWidget", "TickerProviderStateMixin", "PracticeScenario", "SampleSecret", "FeedbackMessage", "PracticeBackgroundPainter", "CelebrationPainter"]
+    },
+    {
+      "class_name": "InteractiveOnboardingScreen",
+      "purpose": "Master integration screen combining wireframe overlay, crypto tutorials, and practice mode into comprehensive learning experience",
+      "methods": [
+        {
+          "method_name": "build",
+          "purpose": "Build integrated onboarding interface with tab navigation and completion tracking",
+          "contract": {
+            "inputs": ["context: BuildContext"],
+            "outputs": ["Widget"],
+            "preconditions": [],
+            "postconditions": ["Returns complete interactive learning interface with progress tracking"]
+          },
+          "dependencies": ["WireframeOverlaySystem", "CryptoTutorialAnimations", "PracticeModeSystem"]
+        },
+        {
+          "method_name": "_toggleWireframeMode",
+          "purpose": "Toggle wireframe overlay system visibility",
+          "contract": {
+            "inputs": [],
+            "outputs": ["void"],
+            "preconditions": [],
+            "postconditions": ["Wireframe mode toggled", "UI state updated", "Haptic feedback provided"]
+          },
+          "dependencies": ["HapticFeedback"]
+        },
+        {
+          "method_name": "_onTutorialComplete",
+          "purpose": "Handle tutorial completion with progress tracking and user feedback",
+          "contract": {
+            "inputs": [],
+            "outputs": ["void"],
+            "preconditions": [],
+            "postconditions": ["Tutorial completion status updated", "Success feedback displayed"]
+          },
+          "dependencies": ["ScaffoldMessenger"]
+        }
+      ],
+      "dependencies": ["StatefulWidget", "TickerProviderStateMixin", "TabController", "WireframeOverlaySystem", "CryptoTutorialAnimations", "PracticeModeSystem"]
     }
   ]
 }

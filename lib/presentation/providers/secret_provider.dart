@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../domains/crypto/shamir/shamir_secret_sharing.dart';
 import '../../domains/crypto/shares/share.dart';
+import '../../domains/storage/repositories/secret_storage_repository.dart';
 
 class SecretInfo {
   final String id;
@@ -20,16 +21,44 @@ class SecretInfo {
     required this.totalShares,
     required this.type,
   });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'name': name,
+      'createdAt': createdAt.toIso8601String(),
+      'threshold': threshold,
+      'totalShares': totalShares,
+      'type': type,
+    };
+  }
+
+  factory SecretInfo.fromMap(Map<String, dynamic> map) {
+    return SecretInfo(
+      id: map['id'],
+      name: map['name'],
+      createdAt: DateTime.parse(map['createdAt']),
+      threshold: map['threshold'],
+      totalShares: map['totalShares'],
+      type: map['type'],
+    );
+  }
 }
 
 class SecretProvider extends ChangeNotifier {
   bool _isLoading = false;
   String? _errorMessage;
   final List<SecretInfo> _secrets = [];
+  final SecretStorageRepository _storageRepository = SecretStorageRepository();
   
   // Current operation states
   MultiSplitResult? _lastResult;
   String? _reconstructedSecret;
+
+  // Constructor - load saved secrets
+  SecretProvider() {
+    _loadSecrets();
+  }
 
   // Getters
   bool get isLoading => _isLoading;
@@ -38,13 +67,37 @@ class SecretProvider extends ChangeNotifier {
   MultiSplitResult? get lastResult => _lastResult;
   String? get reconstructedSecret => _reconstructedSecret;
 
+  // Load secrets from storage
+  Future<void> _loadSecrets() async {
+    try {
+      final savedSecrets = await _storageRepository.loadSecrets();
+      _secrets.clear();
+      for (final secretMap in savedSecrets) {
+        _secrets.add(SecretInfo.fromMap(secretMap));
+      }
+      notifyListeners();
+    } catch (e) {
+      // Silently fail - just use empty list
+    }
+  }
+
+  // Save secrets to storage
+  Future<void> _saveSecrets() async {
+    try {
+      final secretMaps = _secrets.map((s) => s.toMap()).toList();
+      await _storageRepository.saveSecrets(secretMaps);
+    } catch (e) {
+      // Silently fail - at least keep in memory
+    }
+  }
+
   // Clear error message
   void clearError() {
     _errorMessage = null;
     notifyListeners();
   }
 
-  // Create secret shares with enhanced state validation
+  // Create secret shares 
   Future<bool> createSecret({
     required String secretName,
     required String secret,
@@ -67,9 +120,6 @@ class SecretProvider extends ChangeNotifier {
         _setLoading(false);
         return false;
       }
-      
-      // Clear any previous results to avoid stale state
-      _lastResult = null;
       
       final result = ShamirSecretSharing.splitString(
         secret: secret,
@@ -113,12 +163,11 @@ class SecretProvider extends ChangeNotifier {
 
       _secrets.add(secretInfo);
       
-      // Force immediate state update with explicit notification
-      _setLoading(false);
-      notifyListeners();
+      // Save to persistent storage
+      await _saveSecrets();
       
-      // Small delay to ensure UI state is updated
-      await Future.delayed(const Duration(milliseconds: 10));
+      // Update state
+      _setLoading(false);
       
       return true;
     } catch (e) {
@@ -129,7 +178,7 @@ class SecretProvider extends ChangeNotifier {
   }
 
   // Reconstruct secret from shares
-  Future<bool> reconstructSecret(List<String> shareStrings) async {
+  bool reconstructSecret(List<String> shareStrings) {
     _setLoading(true);
     _clearError();
 
@@ -173,30 +222,38 @@ class SecretProvider extends ChangeNotifier {
   }
 
   // Remove a secret from the list
-  void removeSecret(String id) {
+  Future<void> removeSecret(String id) async {
     _secrets.removeWhere((secret) => secret.id == id);
+    await _saveSecrets();
     notifyListeners();
   }
 
   // Get distribution packages for sharing with enhanced error handling
   List<ParticipantPackage> getDistributionPackages() {
     if (_lastResult == null) {
-      print('WARNING: getDistributionPackages called with null _lastResult');
       return [];
     }
     
     try {
       final packages = _lastResult!.createDistributionPackages();
-      if (packages.isEmpty) {
-        print('WARNING: createDistributionPackages returned empty list');
-        print('ShareSets count: ${_lastResult!.shareSets.length}');
-      }
       return packages;
     } catch (e) {
-      print('ERROR: Failed to create distribution packages: $e');
       _setError('Failed to create distribution packages: $e');
       return [];
     }
+  }
+  
+  // Safe distribution packages getter that preserves state during UI operations
+  List<ParticipantPackage> getSafeDistributionPackages() {
+    // Return cached packages to avoid state clearing issues
+    if (_lastResult != null) {
+      try {
+        return _lastResult!.createDistributionPackages();
+      } catch (e) {
+        return [];
+      }
+    }
+    return [];
   }
   
   // Validate that secret creation completed successfully

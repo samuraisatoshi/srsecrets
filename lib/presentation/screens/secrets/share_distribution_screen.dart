@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../providers/secret_provider.dart';
 import '../../widgets/share_card_widget.dart';
+import '../../../domains/crypto/shamir/shamir_secret_sharing.dart';
 
 class ShareDistributionScreen extends StatefulWidget {
   const ShareDistributionScreen({super.key});
@@ -14,22 +15,29 @@ class ShareDistributionScreen extends StatefulWidget {
 
 class _ShareDistributionScreenState extends State<ShareDistributionScreen> {
   bool _isRetrying = false;
+  List<ParticipantPackage>? _cachedPackages;
+  bool _isClearing = false;
   
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final secretProvider = context.watch<SecretProvider>();
-    final packages = secretProvider.getDistributionPackages();
     
-    // Enhanced debugging and error detection
-    if (packages.isEmpty) {
-      if (secretProvider.lastResult != null) {
-        print('WARNING: lastResult exists but packages are empty');
-        print('ShareSets count: ${secretProvider.lastResult?.shareSets.length}');
-        print('Secret ready status: ${secretProvider.isSecretReady}');
-      } else {
-        print('ERROR: No lastResult available in ShareDistributionScreen');
+    // Use cached packages if available and state is being cleared
+    List<ParticipantPackage> packages;
+    if (_isClearing && _cachedPackages != null) {
+      packages = _cachedPackages!;
+    } else {
+      packages = secretProvider.getDistributionPackages();
+      // Cache packages on first successful load
+      if (packages.isNotEmpty && _cachedPackages == null) {
+        _cachedPackages = packages;
       }
+    }
+    
+    // Check for error state
+    if (packages.isEmpty && secretProvider.lastResult == null) {
+      // No shares available - show error UI
     }
 
     return Scaffold(
@@ -194,8 +202,7 @@ class _ShareDistributionScreenState extends State<ShareDistributionScreen> {
                         width: double.infinity,
                         child: TextButton(
                           onPressed: () {
-                            secretProvider.clearResults();
-                            Navigator.of(context).pop();
+                            _handleDone(secretProvider);
                           },
                           child: const Text('Done'),
                         ),
@@ -223,7 +230,7 @@ class _ShareDistributionScreenState extends State<ShareDistributionScreen> {
     final shareText = '''
 Secret Share ${package.participantNumber}
 
-${package.shareSet.toJson()}
+${package.shareSet.toBase64()}
 
 Keep this share secure. You need ${package.threshold} shares to reconstruct the secret.
 ''';
@@ -240,7 +247,7 @@ Keep this share secure. You need ${package.threshold} shares to reconstruct the 
   void _copyAllShares(List packages) {
     final allShares = packages.map((package) => {
       'participant': package.participantNumber,
-      'share': package.shareSet.toJson(),
+      'share': package.shareSet.toBase64(),
     }).toList();
     
     final shareText = allShares.map((share) => 
@@ -307,6 +314,21 @@ Keep this share secure. You need ${package.threshold} shares to reconstruct the 
         });
       }
     }
+  }
+
+  void _handleDone(SecretProvider secretProvider) {
+    // Set clearing flag to preserve cached packages during navigation
+    setState(() {
+      _isClearing = true;
+    });
+    
+    // Clear results after a brief delay to allow navigation to complete
+    Future.delayed(const Duration(milliseconds: 50), () {
+      if (mounted) {
+        secretProvider.clearResults();
+        Navigator.of(context).pop();
+      }
+    });
   }
 
   void _showHelpDialog(BuildContext context) {
