@@ -456,14 +456,25 @@ class ShareGenerator {
     final id = _generateShareSetId();
     final createdAt = DateTime.now();
     
-    // Create shares for each byte position
+    // Generate x values once to be reused across all byte positions
+    final xValues = PolynomialGenerator.generateEvaluationPoints(totalShares);
+    
+    // Create shares for each byte position using the same x values
     final allSharesByPosition = <List<Share>>[];
     for (int byte in secretBytes) {
-      final shares = generateShares(
+      // Generate polynomial with secret as constant term
+      final coefficients = PolynomialGenerator.generatePolynomial(
         secret: byte,
         threshold: threshold,
-        totalShares: totalShares,
       );
+      
+      // Create shares by evaluating polynomial at each x
+      final shares = <Share>[];
+      for (int x in xValues) {
+        final y = PolynomialGenerator.evaluatePolynomial(coefficients, x);
+        shares.add(Share(x: x, y: y));
+      }
+      
       allSharesByPosition.add(shares);
     }
     

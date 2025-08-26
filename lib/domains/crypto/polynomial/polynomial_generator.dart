@@ -211,8 +211,13 @@ class PolynomialGenerator {
     
     if (fixedCoefficients != null) {
       // Use provided coefficients for testing
-      for (int i = 1; i <= degree && i <= fixedCoefficients.length; i++) {
-        coefficients[i] = fixedCoefficients[i - 1];
+      for (int i = 1; i <= degree; i++) {
+        if (i <= fixedCoefficients.length) {
+          coefficients[i] = fixedCoefficients[i - 1];
+        } else {
+          // Use sequential values for remaining coefficients
+          coefficients[i] = i;
+        }
       }
       // Ensure highest coefficient is non-zero
       if (coefficients[degree] == 0) {

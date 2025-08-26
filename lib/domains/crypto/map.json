@@ -200,29 +200,40 @@
       "purpose": "Extended share with integrity verification and metadata tracking",
       "methods": [
         {
-          "method_name": "calculateChecksum",
-          "purpose": "Calculate integrity checksum for share data",
+          "method_name": "calculateHmac",
+          "purpose": "Calculate HMAC-SHA256 for share integrity verification",
           "contract": {
-            "inputs": ["x: int", "y: int", "threshold: int", "totalShares: int"],
-            "outputs": ["int"],
-            "preconditions": [],
-            "postconditions": ["Returns XOR-based checksum of share parameters"]
+            "inputs": ["x: int", "y: int", "threshold: int", "totalShares: int", "version: int", "identifier?: String"],
+            "outputs": ["Uint8List"],
+            "preconditions": ["All inputs are valid"],
+            "postconditions": ["Returns 32-byte HMAC-SHA256 hash"]
           },
-          "dependencies": []
+          "dependencies": ["crypto.Hmac", "crypto.sha256"]
         },
         {
-          "method_name": "hasValidChecksum",
-          "purpose": "Verify share integrity against stored checksum",
+          "method_name": "hasValidHmac",
+          "purpose": "Verify HMAC integrity using constant-time comparison",
           "contract": {
             "inputs": [],
             "outputs": ["bool"],
             "preconditions": [],
-            "postconditions": ["Returns true if checksum matches calculated value"]
+            "postconditions": ["Returns true if HMAC verification passes"]
           },
-          "dependencies": ["calculateChecksum"]
+          "dependencies": ["calculateHmac", "constantTimeEquals"]
+        },
+        {
+          "method_name": "constantTimeEquals",
+          "purpose": "Constant-time byte array comparison to prevent timing attacks",
+          "contract": {
+            "inputs": ["a: Uint8List", "b: Uint8List"],
+            "outputs": ["bool"],
+            "preconditions": [],
+            "postconditions": ["Returns equality result without timing leakage"]
+          },
+          "dependencies": []
         }
       ],
-      "dependencies": ["Share"]
+      "dependencies": ["Share", "crypto.Hmac", "crypto.sha256", "dart:typed_data"]
     },
     {
       "class_name": "ShareSet",
@@ -329,9 +340,42 @@
             "postconditions": ["Returns true if reconstruction is possible"]
           },
           "dependencies": []
+        },
+        {
+          "method_name": "reconstructWithVerification",
+          "purpose": "Reconstruct with consistency verification using redundant shares",
+          "contract": {
+            "inputs": ["shares: List<Share>", "threshold: int"],
+            "outputs": ["ReconstructionResult"],
+            "preconditions": ["shares.length >= threshold"],
+            "postconditions": ["Returns result with success status and error detection"]
+          },
+          "dependencies": ["reconstructSecret", "ReconstructionResult"]
+        },
+        {
+          "method_name": "reconstructFromSecureShares",
+          "purpose": "Reconstruct from SecureShare objects with HMAC verification",
+          "contract": {
+            "inputs": ["shares: List<SecureShare>"],
+            "outputs": ["int"],
+            "preconditions": ["All shares have valid HMAC", "Consistent metadata"],
+            "postconditions": ["Returns original secret or throws on verification failure"]
+          },
+          "dependencies": ["SecureShare", "reconstructSecret"]
+        },
+        {
+          "method_name": "createProgressive",
+          "purpose": "Create progressive reconstructor for incremental share addition",
+          "contract": {
+            "inputs": ["threshold: int"],
+            "outputs": ["ProgressiveReconstructor"],
+            "preconditions": ["threshold >= 2"],
+            "postconditions": ["Returns initialized progressive reconstructor"]
+          },
+          "dependencies": ["ProgressiveReconstructor"]
         }
       ],
-      "dependencies": ["GF256", "Share", "ShareSet", "dart:typed_data"]
+      "dependencies": ["GF256", "Share", "SecureShare", "ShareSet", "ProgressiveReconstructor", "ReconstructionResult", "dart:typed_data"]
     },
     {
       "class_name": "ShamirSecretSharing",
@@ -405,6 +449,157 @@
         }
       ],
       "dependencies": ["ShareGenerator", "SecretReconstructor", "Share", "ShareSet", "dart:convert", "dart:typed_data"]
+    },
+    {
+      "class_name": "ReconstructionResult",
+      "purpose": "Result wrapper for secret reconstruction operations with success status and error handling",
+      "methods": [],
+      "dependencies": []
+    },
+    {
+      "class_name": "ShareSetMetadata",
+      "purpose": "Metadata container for ShareSet objects tracking creation time, description, and share parameters",
+      "methods": [
+        {
+          "method_name": "toJson",
+          "purpose": "Serialize metadata to JSON format",
+          "contract": {
+            "inputs": [],
+            "outputs": ["Map<String, dynamic>"],
+            "preconditions": [],
+            "postconditions": ["Returns JSON-serializable metadata map"]
+          },
+          "dependencies": []
+        },
+        {
+          "method_name": "fromJson",
+          "purpose": "Deserialize metadata from JSON",
+          "contract": {
+            "inputs": ["json: Map<String, dynamic>"],
+            "outputs": ["ShareSetMetadata"],
+            "preconditions": ["JSON contains required fields"],
+            "postconditions": ["Returns reconstructed metadata object"]
+          },
+          "dependencies": []
+        }
+      ],
+      "dependencies": []
+    },
+    {
+      "class_name": "SplitResult",
+      "purpose": "Result container for single-byte secret splitting operations with shares and metadata",
+      "methods": [
+        {
+          "method_name": "getShare",
+          "purpose": "Retrieve share at specific index",
+          "contract": {
+            "inputs": ["index: int"],
+            "outputs": ["SecureShare?"],
+            "preconditions": [],
+            "postconditions": ["Returns share at index or null if out of bounds"]
+          },
+          "dependencies": []
+        },
+        {
+          "method_name": "toJson",
+          "purpose": "Export shares as JSON array",
+          "contract": {
+            "inputs": [],
+            "outputs": ["List<Map<String, dynamic>>"],
+            "preconditions": [],
+            "postconditions": ["Returns JSON array of share objects"]
+          },
+          "dependencies": ["SecureShare.toJson"]
+        }
+      ],
+      "dependencies": ["SecureShare"]
+    },
+    {
+      "class_name": "MultiSplitResult",
+      "purpose": "Result container for multi-byte secret splitting with share sets and comprehensive metadata",
+      "methods": [
+        {
+          "method_name": "getShareSet",
+          "purpose": "Retrieve share set at specific participant index",
+          "contract": {
+            "inputs": ["index: int"],
+            "outputs": ["ShareSet?"],
+            "preconditions": [],
+            "postconditions": ["Returns share set or null if out of bounds"]
+          },
+          "dependencies": []
+        },
+        {
+          "method_name": "toJson",
+          "purpose": "Export all share sets as JSON",
+          "contract": {
+            "inputs": [],
+            "outputs": ["Map<String, dynamic>"],
+            "preconditions": [],
+            "postconditions": ["Returns complete JSON representation"]
+          },
+          "dependencies": ["ShareSet.toJson"]
+        }
+      ],
+      "dependencies": ["ShareSet"]
+    },
+    {
+      "class_name": "ProgressiveReconstructor",
+      "purpose": "Incremental reconstructor that builds secrets as shares are added progressively",
+      "methods": [
+        {
+          "method_name": "addShare",
+          "purpose": "Add a share to the reconstruction process",
+          "contract": {
+            "inputs": ["share: Share"],
+            "outputs": ["bool"],
+            "preconditions": ["share is valid", "share x-value not already present"],
+            "postconditions": ["Returns true if reconstruction completed"]
+          },
+          "dependencies": ["SecretReconstructor"]
+        },
+        {
+          "method_name": "reset",
+          "purpose": "Clear all accumulated shares and reset state",
+          "contract": {
+            "inputs": [],
+            "outputs": [],
+            "preconditions": [],
+            "postconditions": ["All shares cleared", "isComplete false"]
+          },
+          "dependencies": []
+        }
+      ],
+      "dependencies": ["Share", "SecretReconstructor"]
+    },
+    {
+      "class_name": "BatchReconstructor",
+      "purpose": "Efficient batch processing of multiple secret reconstructions",
+      "methods": [
+        {
+          "method_name": "reconstructMultiple",
+          "purpose": "Reconstruct multiple secrets from grouped shares",
+          "contract": {
+            "inputs": ["shareGroups: List<List<Share>>", "threshold: int"],
+            "outputs": ["List<int>"],
+            "preconditions": ["Each group has >= threshold shares"],
+            "postconditions": ["Returns list of reconstructed secrets"]
+          },
+          "dependencies": ["SecretReconstructor"]
+        },
+        {
+          "method_name": "reconstructParallel",
+          "purpose": "Asynchronous parallel reconstruction for large batches",
+          "contract": {
+            "inputs": ["shareGroups: List<List<Share>>", "threshold: int"],
+            "outputs": ["Future<List<int>>"],
+            "preconditions": ["Same as reconstructMultiple"],
+            "postconditions": ["Returns Future resolving to reconstructed secrets"]
+          },
+          "dependencies": ["reconstructMultiple"]
+        }
+      ],
+      "dependencies": ["SecretReconstructor"]
     }
   ]
 }
