@@ -197,20 +197,25 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen>
     return Scaffold(
       body: Stack(
         children: [
-          // Main content
-          PageView.builder(
-            controller: _mainPageController,
-            onPageChanged: (index) {
-              setState(() {
-                _currentMainIndex = index;
-              });
-              _transitionController.reset();
-              _transitionController.forward();
-            },
-            itemCount: _onboardingFlows.length,
-            itemBuilder: (context, index) {
-              return _onboardingFlows[index].screen;
-            },
+          // Main content with top padding to clear overlay navigation bar
+          Padding(
+            padding: EdgeInsets.only(
+              top: isTablet ? 0 : 80, // Clear the overlay nav bar on mobile
+            ),
+            child: PageView.builder(
+              controller: _mainPageController,
+              onPageChanged: (index) {
+                setState(() {
+                  _currentMainIndex = index;
+                });
+                _transitionController.reset();
+                _transitionController.forward();
+              },
+              itemCount: _onboardingFlows.length,
+              itemBuilder: (context, index) {
+                return _onboardingFlows[index].screen;
+              },
+            ),
           ),
           
           // Top navigation bar
@@ -237,12 +242,12 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen>
             child: SafeArea(
               child: Container(
                 margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
                   color: isDark
-                      ? Colors.black.withValues(alpha: 0.8)
-                      : Colors.white.withValues(alpha: 0.9),
-                  borderRadius: BorderRadius.circular(25),
+                      ? Colors.black.withValues(alpha: 0.9)
+                      : Colors.white.withValues(alpha: 0.95),
+                  borderRadius: BorderRadius.circular(28),
                   border: Border.all(
                     color: theme.colorScheme.outline.withValues(alpha: 0.2),
                   ),
@@ -263,30 +268,44 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen>
                         final index = entry.key;
                         final flow = entry.value;
                         final isActive = index == _currentMainIndex;
-                        
+
                         return Container(
-                          margin: const EdgeInsets.only(right: 4),
+                          margin: const EdgeInsets.only(right: 8),
                           child: Material(
                             color: Colors.transparent,
                             child: InkWell(
                               onTap: () => _navigateToFlow(index),
-                              borderRadius: BorderRadius.circular(16),
+                              borderRadius: BorderRadius.circular(20),
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                // Minimum touch target 48x48
+                                constraints: const BoxConstraints(
+                                  minWidth: 48,
+                                  minHeight: 48,
+                                ),
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: isActive
+                                      ? flow.color.withValues(alpha: 0.15)
+                                      : Colors.transparent,
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
+                                  mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     Icon(
                                       flow.icon,
-                                      size: 16,
-                                      color: isActive ? flow.color : theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                                      size: 24,
+                                      color: isActive
+                                          ? flow.color
+                                          : theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
                                     ),
                                     if (isActive) ...[
-                                      const SizedBox(width: 4),
+                                      const SizedBox(width: 6),
                                       AnimatedContainer(
                                         duration: const Duration(milliseconds: 300),
-                                        width: 6,
-                                        height: 6,
+                                        width: 8,
+                                        height: 8,
                                         decoration: BoxDecoration(
                                           color: flow.color,
                                           shape: BoxShape.circle,
@@ -301,15 +320,15 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen>
                         );
                       }).toList(),
                     ),
-                    
+
                     // Skip button
                     TextButton(
                       onPressed: _skipOnboarding,
                       style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                         backgroundColor: theme.colorScheme.surfaceContainer.withValues(alpha: 0.5),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
+                          borderRadius: BorderRadius.circular(20),
                         ),
                       ),
                       child: Row(
@@ -326,7 +345,7 @@ class _OnboardingFlowScreenState extends State<OnboardingFlowScreen>
                           const SizedBox(width: 4),
                           Icon(
                             Icons.arrow_forward,
-                            size: 16,
+                            size: 18,
                             color: theme.colorScheme.onSurfaceVariant,
                           ),
                         ],
