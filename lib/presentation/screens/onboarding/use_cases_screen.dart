@@ -319,9 +319,9 @@ class _UseCasesScreenState extends State<UseCasesScreen>
           child: _buildHeader(theme, isDark),
         ),
         
-        // Category tabs
+        // Category tabs - increased height for better touch targets
         SizedBox(
-          height: 60,
+          height: 68,
           child: _buildMobileCategoryTabs(theme, isDark),
         ),
         
@@ -422,7 +422,7 @@ class _UseCasesScreenState extends State<UseCasesScreen>
 
   Widget _buildMobileCategoryTabs(ThemeData theme, bool isDark) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
         children: _categories.asMap().entries.map((entry) {
           final index = entry.key;
@@ -435,7 +435,7 @@ class _UseCasesScreenState extends State<UseCasesScreen>
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 300),
                 margin: const EdgeInsets.symmetric(horizontal: 4),
-                padding: const EdgeInsets.symmetric(vertical: 12),
+                padding: const EdgeInsets.symmetric(vertical: 8),
                 decoration: BoxDecoration(
                   gradient: isSelected
                       ? LinearGradient(
@@ -456,15 +456,17 @@ class _UseCasesScreenState extends State<UseCasesScreen>
                       : null,
                 ),
                 child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
                       category.icon,
                       color: isSelected
                           ? Colors.white
                           : theme.colorScheme.onSurfaceVariant,
-                      size: 20,
+                      size: 22,
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 2),
                     Text(
                       category.title.split(' ').first,
                       style: TextStyle(

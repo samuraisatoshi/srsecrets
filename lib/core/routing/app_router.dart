@@ -13,10 +13,12 @@ class AppRouter {
   ///
   /// Flow:
   /// 1. First launch/onboarding incomplete -> Onboarding
-  /// 2. User hasn't seen PIN setup -> PIN Setup (with skip option)
-  /// 3. PIN required but not set -> PIN Setup
-  /// 4. PIN required and set but not authenticated -> PIN Login
-  /// 5. Otherwise -> Home
+  /// 2. Already authenticated with PIN set -> Home (handles race condition during setup)
+  /// 3. User hasn't seen PIN setup -> PIN Setup (with skip option)
+  /// 4. PIN not required -> Home
+  /// 5. PIN required but not set -> PIN Setup
+  /// 6. PIN required and set but not authenticated -> PIN Login
+  /// 7. Otherwise -> Home
   static Widget determineInitialRoute({
     required bool isAuthenticated,
     required bool isPinSet,
@@ -25,34 +27,53 @@ class AppRouter {
     bool isPinRequired = false,
     bool hasSeenPinSetup = false,
   }) {
+    // Debug logging for routing decisions
+    print('[AppRouter] Route decision: isAuth=$isAuthenticated, isPinSet=$isPinSet, '
+        'onboardingComplete=$isOnboardingCompleted, firstLaunch=$isFirstLaunch, '
+        'pinRequired=$isPinRequired, seenPinSetup=$hasSeenPinSetup');
+
     // Route determination logic follows clear precedence rules
 
     // 1. First launch or incomplete onboarding -> Onboarding Flow
     if (isFirstLaunch || !isOnboardingCompleted) {
+      print('[AppRouter] -> OnboardingFlowScreen (first launch or onboarding incomplete)');
       return const OnboardingFlowScreen();
     }
 
-    // 2. User hasn't made PIN decision yet -> Show PIN Setup with Skip option
-    if (!hasSeenPinSetup) {
-      return const PremiumPinSetupScreen();
-    }
-
-    // 3. If PIN is not required, skip PIN login entirely
-    if (!isPinRequired) {
+    // 2. If user just completed PIN setup (authenticated + isPinSet), go to Home
+    // This handles the race condition where setupPin calls notifyListeners()
+    // before setPinRequired(true) is called, avoiding the PIN setup loop
+    if (isAuthenticated && isPinSet) {
+      print('[AppRouter] -> PremiumHomeScreen (authenticated with PIN set)');
       return const PremiumHomeScreen();
     }
 
-    // 4. PIN required but not configured -> PIN Setup
-    if (!isPinSet) {
+    // 3. User hasn't made PIN decision yet -> Show PIN Setup with Skip option
+    if (!hasSeenPinSetup) {
+      print('[AppRouter] -> PremiumPinSetupScreen (hasnt seen PIN setup)');
       return const PremiumPinSetupScreen();
     }
 
-    // 5. PIN configured but not authenticated -> PIN Login
+    // 4. If PIN is not required, skip PIN login entirely
+    if (!isPinRequired) {
+      print('[AppRouter] -> PremiumHomeScreen (PIN not required)');
+      return const PremiumHomeScreen();
+    }
+
+    // 5. PIN required but not configured -> PIN Setup
+    if (!isPinSet) {
+      print('[AppRouter] -> PremiumPinSetupScreen (PIN required but not set)');
+      return const PremiumPinSetupScreen();
+    }
+
+    // 6. PIN configured but not authenticated -> PIN Login
     if (!isAuthenticated) {
+      print('[AppRouter] -> PremiumPinLoginScreen (needs authentication)');
       return const PremiumPinLoginScreen();
     }
 
-    // 6. Fully authenticated -> Main Application
+    // 7. Fully authenticated -> Main Application
+    print('[AppRouter] -> PremiumHomeScreen (fully authenticated)');
     return const PremiumHomeScreen();
   }
 
@@ -67,6 +88,9 @@ class AppRouter {
   }) {
     if (isFirstLaunch || !isOnboardingCompleted) {
       return '/onboarding';
+    }
+    if (isAuthenticated && isPinSet) {
+      return '/home';
     }
     if (!hasSeenPinSetup) {
       return '/pin-setup';

@@ -96,8 +96,11 @@ class _PremiumPinSetupScreenState extends State<PremiumPinSetupScreen>
     final success = await authProvider.setupPin(_pin);
 
     if (success && mounted) {
-      // User chose to set PIN, so enable PIN requirement
+      // Mark PIN as required and hasSeenPinSetup
       await settingsProvider.setPinRequired(true);
+      // Navigation will happen automatically via provider state change in main.dart
+      // At this point: isPinSet=true, isAuthenticated=true, hasSeenPinSetup=true, isPinRequired=true
+      // Router will navigate to HomeScreen
     } else if (!success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

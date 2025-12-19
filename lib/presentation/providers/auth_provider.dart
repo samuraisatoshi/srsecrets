@@ -45,17 +45,21 @@ class AuthProvider extends ChangeNotifier {
 
   // Check if PIN is already set and authentication status
   Future<void> checkAuthStatus() async {
+    print('[AuthProvider] checkAuthStatus called');
     _setLoading(true);
     try {
       _isPinSet = await _pinService.isPinSet();
       _isAuthenticated = false; // Always require authentication on app start
-      
+
+      print('[AuthProvider] checkAuthStatus result: isPinSet=$_isPinSet, isAuthenticated=$_isAuthenticated');
+
       // For now, assume no failed attempts on app start
       // In a real implementation, you'd store attempt history
       _failedAttempts = 0;
       _isLocked = false;
       _lockoutDuration = Duration.zero;
     } catch (e) {
+      print('[AuthProvider] checkAuthStatus ERROR: $e');
       _setError('Failed to check authentication status: $e');
     } finally {
       _setLoading(false);
@@ -116,9 +120,11 @@ class AuthProvider extends ChangeNotifier {
 
   // Logout
   void logout() {
+    print('[AuthProvider] Logout called - setting isAuthenticated=false');
     _isAuthenticated = false;
     _clearError();
     notifyListeners();
+    print('[AuthProvider] Logout complete - notifyListeners called');
   }
 
   // Private helper methods

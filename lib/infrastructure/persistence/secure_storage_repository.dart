@@ -76,31 +76,38 @@ class SecureStorageRepository implements IPinStorageRepository {
   @override
   Future<PinHash?> loadPinHash() async {
     try {
-      developer.log('Loading PIN hash', name: _logName);
+      print('[$_logName] Loading PIN hash...');
 
       await _migrateOldData();
 
       String filePath = await _getFilePath(_pinHashFile);
       File file = File(filePath);
 
-      if (!await file.exists()) {
-        developer.log('PIN hash file not found', name: _logName);
+      print('[$_logName] Checking file: $filePath');
+      bool fileExists = await file.exists();
+      print('[$_logName] File exists: $fileExists');
+
+      if (!fileExists) {
+        print('[$_logName] PIN hash file not found - returning null');
         return null;
       }
 
       String encryptedContent = await file.readAsString();
+      print('[$_logName] File content length: ${encryptedContent.length}');
+
       if (encryptedContent.isEmpty) {
-        developer.log('PIN hash file is empty', name: _logName);
+        print('[$_logName] PIN hash file is empty - returning null');
         return null;
       }
 
       Map<String, dynamic> data = _encryptionService.decrypt(encryptedContent);
       PinHash pinHash = PinHash.fromMap(data);
 
-      developer.log('PIN hash loaded successfully', name: _logName);
+      print('[$_logName] PIN hash loaded successfully');
       return pinHash;
     } catch (e, stackTrace) {
-      developer.log('ERROR loading PIN hash', name: _logName, error: e, stackTrace: stackTrace);
+      print('[$_logName] ERROR loading PIN hash: $e');
+      print('[$_logName] Stack trace: $stackTrace');
       return null;
     }
   }
@@ -318,20 +325,34 @@ class SecureStorageRepository implements IPinStorageRepository {
   }
 
   Future<void> _migrateOldData() async {
+    // Migration is only needed on iOS/macOS where we moved from Documents to Application Support
+    // On Android, both getApplicationDocumentsDirectory() and the current storage location are the same
+    // So we should skip migration entirely on Android to avoid deleting current data
+    if (Platform.isAndroid) {
+      return;
+    }
+
     try {
       Directory oldDocDir = await getApplicationDocumentsDirectory();
       Directory oldSecureDir = Directory('${oldDocDir.path}/secure_auth');
 
       if (!await oldSecureDir.exists()) return;
 
-      developer.log('Found old storage, checking migration', name: _logName);
+      // Double-check: if old path equals new path, skip migration
+      await _initializeDirectory();
+      if (oldSecureDir.path == _secureDirectory!.path) {
+        print('[$_logName] Skipping migration - old and new paths are identical');
+        return;
+      }
+
+      print('[$_logName] Found old storage at ${oldSecureDir.path}, migrating...');
 
       File oldPinFile = File('${oldSecureDir.path}/$_pinHashFile');
       String newPinPath = await _getFilePath(_pinHashFile);
       File newPinFile = File(newPinPath);
 
       if (await oldPinFile.exists() && !await newPinFile.exists()) {
-        developer.log('Migrating PIN data', name: _logName);
+        print('[$_logName] Migrating PIN data');
         await oldPinFile.copy(newPinPath);
 
         File oldAttemptFile = File('${oldSecureDir.path}/$_attemptHistoryFile');
@@ -340,12 +361,12 @@ class SecureStorageRepository implements IPinStorageRepository {
           await oldAttemptFile.copy(newAttemptPath);
         }
 
-        developer.log('Migration complete', name: _logName);
+        print('[$_logName] Migration complete');
       }
 
       await _cleanupOldDirectory(oldSecureDir);
     } catch (e, stackTrace) {
-      developer.log('Migration error (non-fatal)', name: _logName, error: e, stackTrace: stackTrace);
+      print('[$_logName] Migration error (non-fatal): $e');
     }
   }
 
