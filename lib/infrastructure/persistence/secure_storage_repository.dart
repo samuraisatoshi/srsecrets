@@ -33,10 +33,10 @@ class SecureStorageRepository implements IPinStorageRepository {
   // ============================================================
 
   Future<void> _initializeDirectory() async {
-    if (_secureDirectory != null) return;
+    if (_secureDirectory != null && await _secureDirectory!.exists()) return;
 
     try {
-      developer.log('Initializing secure storage directory', name: _logName);
+      print('[$_logName] Initializing secure storage directory');
 
       Directory appDir = Platform.isIOS || Platform.isMacOS
           ? await getApplicationSupportDirectory()
@@ -44,18 +44,22 @@ class SecureStorageRepository implements IPinStorageRepository {
 
       _secureDirectory = Directory('${appDir.path}/secure_auth');
 
-      developer.log('Secure directory: ${_secureDirectory!.path}', name: _logName);
+      print('[$_logName] Secure directory path: ${_secureDirectory!.path}');
 
       if (!await _secureDirectory!.exists()) {
+        print('[$_logName] Creating secure directory...');
         await _secureDirectory!.create(recursive: true);
-        developer.log('Created secure directory', name: _logName);
+        print('[$_logName] Secure directory created successfully');
 
         if (Platform.isLinux || Platform.isMacOS) {
           await Process.run('chmod', ['700', _secureDirectory!.path]);
         }
+      } else {
+        print('[$_logName] Secure directory already exists');
       }
     } catch (e, stackTrace) {
-      developer.log('CRITICAL: Failed to init storage', name: _logName, error: e, stackTrace: stackTrace);
+      print('[$_logName] CRITICAL: Failed to init storage: $e');
+      print('[$_logName] Stack trace: $stackTrace');
       throw Exception('Failed to initialize secure storage: $e');
     }
   }
@@ -104,18 +108,21 @@ class SecureStorageRepository implements IPinStorageRepository {
   @override
   Future<void> savePinHash(PinHash pinHash) async {
     try {
-      developer.log('Saving PIN hash', name: _logName);
+      print('[$_logName] Saving PIN hash...');
 
       String filePath = await _getFilePath(_pinHashFile);
+      print('[$_logName] File path: $filePath');
+
       Map<String, dynamic> data = pinHash.toMap();
       String encryptedContent = _encryptionService.encrypt(data);
 
       File file = File(filePath);
       await file.writeAsString(encryptedContent, flush: true);
 
-      developer.log('PIN hash saved successfully', name: _logName);
+      print('[$_logName] PIN hash saved successfully');
     } catch (e, stackTrace) {
-      developer.log('ERROR saving PIN hash', name: _logName, error: e, stackTrace: stackTrace);
+      print('[$_logName] ERROR saving PIN hash: $e');
+      print('[$_logName] Stack trace: $stackTrace');
       throw Exception('Failed to save PIN hash: $e');
     }
   }
