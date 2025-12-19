@@ -4,7 +4,7 @@ import '../../providers/auth_provider.dart';
 import '../../widgets/premium_pin_input.dart';
 import '../../widgets/premium_security_card.dart';
 import '../../widgets/security_badges.dart';
-import '../../theme/premium_theme.dart';
+import '../../widgets/app_branding_logo.dart';
 
 /// Premium PIN login screen matching Trezor/Ledger standards
 class PremiumPinLoginScreen extends StatefulWidget {
@@ -95,10 +95,10 @@ class _PremiumPinLoginScreenState extends State<PremiumPinLoginScreen>
                     child: Column(
                       children: [
                         const SizedBox(height: 40),
-                        
+
                         // Logo and branding
-                        _buildLogo(context, isDark),
-                        
+                        const AppBrandingLogo(),
+
                         const SizedBox(height: 48),
                         
                         // Main content card
@@ -124,65 +124,6 @@ class _PremiumPinLoginScreenState extends State<PremiumPinLoginScreen>
           ),
         ),
       ),
-    );
-  }
-
-  Widget _buildLogo(BuildContext context, bool isDark) {
-    final theme = Theme.of(context);
-    
-    return Column(
-      children: [
-        Container(
-          width: 100,
-          height: 100,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                theme.colorScheme.primary,
-                theme.colorScheme.tertiary,
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                color: theme.colorScheme.primary.withValues(alpha: 0.3),
-                blurRadius: 30,
-                offset: const Offset(0, 10),
-              ),
-            ],
-          ),
-          child: const Icon(
-            Icons.shield,
-            size: 56,
-            color: Colors.white,
-          ),
-        ),
-        const SizedBox(height: 24),
-        ShaderMask(
-          shaderCallback: (bounds) => PremiumTheme.getPremiumGradient(bounds),
-          child: const Text(
-            'SRSecrets',
-            style: TextStyle(
-              fontSize: 32,
-              fontWeight: FontWeight.w700,
-              letterSpacing: -1,
-              color: Colors.white,
-            ),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Hardware-Grade Security',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: theme.colorScheme.onSurfaceVariant,
-            letterSpacing: 0.5,
-          ),
-        ),
-      ],
     );
   }
 
