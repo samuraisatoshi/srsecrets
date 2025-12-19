@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 
 import 'presentation/providers/auth_provider.dart';
 import 'presentation/providers/secret_provider.dart';
 import 'presentation/providers/onboarding_provider.dart';
+import 'presentation/providers/settings_provider.dart';
+import 'domains/i18n/providers/i18n_provider.dart';
 import 'presentation/theme/premium_theme.dart';
 import 'core/routing/app_router.dart';
+import 'l10n/app_localizations.dart';
 
 void main() {
   runApp(const SRSecretsApp());
@@ -19,6 +23,9 @@ class SRSecretsApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(
+          create: (context) => I18nProvider(),
+        ),
+        ChangeNotifierProvider(
           create: (context) => AuthProvider(),
         ),
         ChangeNotifierProvider(
@@ -27,14 +34,29 @@ class SRSecretsApp extends StatelessWidget {
         ChangeNotifierProvider(
           create: (context) => OnboardingProvider(),
         ),
+        ChangeNotifierProvider(
+          create: (context) => SettingsProvider(),
+        ),
       ],
-      child: MaterialApp(
-        title: 'SRSecrets',
-        theme: PremiumTheme.getLightTheme(),
-        darkTheme: PremiumTheme.getDarkTheme(),
-        themeMode: ThemeMode.system,
-        home: const AuthWrapper(),
-        debugShowCheckedModeBanner: false,
+      child: Consumer<I18nProvider>(
+        builder: (context, i18nProvider, child) {
+          return MaterialApp(
+            title: 'SRSecrets',
+            locale: i18nProvider.getFlutterLocale(),
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: I18nProvider.getSupportedFlutterLocales(),
+            theme: PremiumTheme.getLightTheme(),
+            darkTheme: PremiumTheme.getDarkTheme(),
+            themeMode: ThemeMode.system,
+            home: const AuthWrapper(),
+            debugShowCheckedModeBanner: false,
+          );
+        },
       ),
     );
   }
@@ -53,17 +75,19 @@ class _AuthWrapperState extends State<AuthWrapper> {
     super.initState();
     // Initialize providers on app start
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<I18nProvider>().initialize();
       context.read<AuthProvider>().checkAuthStatus();
       context.read<OnboardingProvider>().initialize();
+      context.read<SettingsProvider>().initialize();
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    return Consumer2<AuthProvider, OnboardingProvider>(
-      builder: (context, authProvider, onboardingProvider, child) {
+    return Consumer4<AuthProvider, OnboardingProvider, I18nProvider, SettingsProvider>(
+      builder: (context, authProvider, onboardingProvider, i18nProvider, settingsProvider, child) {
         // Show loading while providers initialize
-        if (authProvider.isLoading) {
+        if (authProvider.isLoading || i18nProvider.isLoading || settingsProvider.isLoading) {
           return const Scaffold(
             body: Center(
               child: CircularProgressIndicator(),
@@ -84,6 +108,8 @@ class _AuthWrapperState extends State<AuthWrapper> {
           isPinSet: authProvider.isPinSet,
           isOnboardingCompleted: onboardingProvider.isOnboardingCompleted,
           isFirstLaunch: onboardingProvider.isFirstLaunch,
+          isPinRequired: settingsProvider.isPinRequired,
+          hasSeenPinSetup: settingsProvider.hasSeenPinSetup,
         );
       },
     );

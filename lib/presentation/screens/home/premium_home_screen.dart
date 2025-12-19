@@ -7,6 +7,7 @@ import '../secrets/secrets_list_screen.dart';
 import '../secrets/create_secret_screen.dart';
 import '../secrets/reconstruct_secret_screen.dart';
 import '../onboarding/onboarding_flow_screen.dart';
+import '../settings/settings_screen.dart';
 
 /// Premium home screen with Trezor/Ledger-inspired design
 class PremiumHomeScreen extends StatefulWidget {
@@ -693,6 +694,22 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
                   child: ElevatedButton.icon(
                     onPressed: () {
                       Navigator.of(context).pop();
+                      _openSettings(context);
+                    },
+                    icon: const Icon(Icons.settings),
+                    label: const Text('Settings'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: theme.colorScheme.secondary,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).pop();
                       _showOnboardingAgain(context);
                     },
                     icon: const Icon(Icons.school),
@@ -822,6 +839,14 @@ class _PremiumHomeScreenState extends State<PremiumHomeScreen>
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => const OnboardingFlowScreen(),
+      ),
+    );
+  }
+
+  void _openSettings(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => const SettingsScreen(),
       ),
     );
   }

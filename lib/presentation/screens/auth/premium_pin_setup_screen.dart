@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:ui';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/settings_provider.dart';
 import '../../widgets/premium_pin_input.dart';
 import '../../widgets/premium_security_card.dart';
 import '../../theme/premium_theme.dart';
@@ -90,9 +91,13 @@ class _PremiumPinSetupScreenState extends State<PremiumPinSetupScreen>
     }
 
     final authProvider = context.read<AuthProvider>();
+    final settingsProvider = context.read<SettingsProvider>();
     final success = await authProvider.setupPin(_pin);
-    
-    if (!success && mounted) {
+
+    if (success && mounted) {
+      // User chose to set PIN, so enable PIN requirement
+      await settingsProvider.setPinRequired(true);
+    } else if (!success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(authProvider.errorMessage ?? 'Failed to setup PIN'),
@@ -223,9 +228,14 @@ class _PremiumPinSetupScreenState extends State<PremiumPinSetupScreen>
           ),
           
           const SizedBox(height: 32),
-          
+
           // Security info
           _buildSecurityInfo(context, isDark),
+
+          const SizedBox(height: 24),
+
+          // Skip button
+          _buildSkipButton(context, isDark),
         ],
       ),
     );
@@ -418,7 +428,7 @@ class _PremiumPinSetupScreenState extends State<PremiumPinSetupScreen>
 
   Widget _buildRequirement(BuildContext context, String text) {
     final theme = Theme.of(context);
-    
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -441,5 +451,154 @@ class _PremiumPinSetupScreenState extends State<PremiumPinSetupScreen>
         ],
       ),
     );
+  }
+
+  Widget _buildSkipButton(BuildContext context, bool isDark) {
+    final theme = Theme.of(context);
+
+    return Column(
+      children: [
+        TextButton.icon(
+          onPressed: () => _showSkipConfirmation(context),
+          icon: Icon(
+            Icons.skip_next,
+            size: 18,
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+          label: Text(
+            'Skip for now',
+            style: TextStyle(
+              color: theme.colorScheme.onSurfaceVariant,
+              fontSize: 14,
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'You can enable PIN protection later in Settings',
+          style: TextStyle(
+            fontSize: 11,
+            color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showSkipConfirmation(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          child: Container(
+            width: 360,
+            decoration: PremiumTheme.getPremiumCard(
+              isDark: isDark,
+              isElevated: true,
+            ),
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primaryContainer.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(28),
+                  ),
+                  child: Icon(
+                    Icons.info_outline,
+                    color: theme.colorScheme.primary,
+                    size: 28,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  'Skip PIN Setup?',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
+                    color: theme.colorScheme.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'This app uses Shamir\'s Secret Sharing to split secrets. No sensitive data is stored on this device, so PIN protection is optional.',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: theme.colorScheme.onSurfaceVariant,
+                    height: 1.5,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.secondaryContainer.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.settings,
+                        size: 16,
+                        color: theme.colorScheme.secondary,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'You can enable PIN anytime in Settings',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: theme.colorScheme.onSurface,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.of(dialogContext).pop(),
+                        child: const Text('Set PIN'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          Navigator.of(dialogContext).pop();
+                          _skipPinSetup(context);
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: theme.colorScheme.primary,
+                          foregroundColor: Colors.white,
+                        ),
+                        child: const Text('Skip'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _skipPinSetup(BuildContext context) {
+    // Set isPinRequired to false, which will trigger navigation to home
+    final settingsProvider = context.read<SettingsProvider>();
+    settingsProvider.setPinRequired(false);
   }
 }

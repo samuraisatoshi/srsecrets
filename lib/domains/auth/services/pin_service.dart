@@ -175,10 +175,14 @@ abstract class IPinService {
   
   /// Get authentication statistics
   Future<Map<String, dynamic>> getAuthenticationStats();
-  
+
   /// Get current lockout status
   Future<Duration?> getLockoutRemaining();
-  
+
+  /// Run comprehensive diagnostics for troubleshooting
+  /// Returns storage info, PIN status, and any detected issues
+  Future<Map<String, dynamic>> runDiagnostics();
+
   /// Secure cleanup of sensitive data
   void dispose();
 }
@@ -202,6 +206,15 @@ abstract class IPinStorageRepository {
   
   /// Clear all authentication data
   Future<void> clearAll();
+
+  /// Check if storage is properly initialized and accessible
+  Future<bool> isAvailable();
+
+  /// Get storage statistics for diagnostics
+  Future<Map<String, dynamic>> getStorageInfo();
+
+  /// Run comprehensive diagnostics
+  Future<Map<String, dynamic>> runDiagnostics();
 }
 
 /// Implementation-specific interface for cryptographic operations

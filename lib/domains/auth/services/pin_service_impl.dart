@@ -40,9 +40,15 @@ class PinServiceImpl implements IPinService {
   @override
   Future<bool> isPinSet() async {
     try {
+      print('[PinService] Checking if PIN is set...');
       PinHash? storedHash = await _storageRepository.loadPinHash();
-      return storedHash != null;
-    } catch (e) {
+      bool isSet = storedHash != null;
+      print('[PinService] PIN is set: $isSet');
+      return isSet;
+    } catch (e, stackTrace) {
+      // ERROR: This was silently returning false, masking real errors
+      print('[PinService] ERROR checking if PIN is set: $e');
+      print('[PinService] Stack trace: $stackTrace');
       // If we can't load, assume no PIN is set
       return false;
     }
@@ -94,53 +100,66 @@ class PinServiceImpl implements IPinService {
   
   @override
   Future<PinHash> setPin(String pin) async {
+    print('[PinService] Setting new PIN...');
     validatePin(pin);
-    
+
     try {
       // Generate secure salt
       Uint8List salt = _cryptoProvider.generateSalt();
-      
+      print('[PinService] Salt generated (${salt.length} bytes)');
+
       // Get recommended iterations for this device
       int iterations = await _cryptoProvider.getRecommendedIterations();
-      
+      print('[PinService] Using $iterations PBKDF2 iterations');
+
       // Hash the PIN
       Uint8List hash = await _cryptoProvider.hashPin(
         pin: pin,
         salt: salt,
         iterations: iterations,
       );
-      
+      print('[PinService] PIN hashed successfully (${hash.length} bytes)');
+
       // Create PinHash object
       PinHash pinHash = PinHash.create(
         hash: hash,
         salt: salt,
         iterations: iterations,
       );
-      
+
       // Store securely
       await _storageRepository.savePinHash(pinHash);
-      
+      print('[PinService] PIN hash stored securely');
+
       // Clear attempt history on new PIN
       await clearAttemptHistory();
-      
+      print('[PinService] Attempt history cleared');
+
+      print('[PinService] PIN setup completed successfully');
       return pinHash;
-      
-    } catch (e) {
+
+    } catch (e, stackTrace) {
       if (e is PinValidationException) rethrow;
+      print('[PinService] ERROR setting PIN: $e');
+      print('[PinService] Stack trace: $stackTrace');
       throw Exception('Failed to set PIN: $e');
     }
   }
   
   @override
   Future<PinAuthResult> authenticate(String pin) async {
+    print('[PinService] Authenticating PIN...');
+
     if (pin.isEmpty) {
+      print('[PinService] Authentication failed: PIN is empty');
       return PinAuthResult.invalidInput('PIN cannot be empty');
     }
-    
+
     DateTime startTime = DateTime.now();
-    
+
     try {
       // Load attempt history
+      print('[PinService] Loading attempt history...');
       AuthAttemptHistory attemptHistory = await _getAttemptHistory();
       
       // Check for active lockout
@@ -157,38 +176,44 @@ class PinServiceImpl implements IPinService {
       }
       
       // Load stored PIN hash
+      print('[PinService] Loading stored PIN hash...');
       PinHash? storedHash = await _storageRepository.loadPinHash();
       if (storedHash == null) {
+        print('[PinService] Authentication failed: No PIN has been set');
         await _recordAttempt(AuthAttempt.create(
           result: AuthResult.failure,
           details: 'No PIN set',
           duration: DateTime.now().difference(startTime),
         ));
-        
+
         return PinAuthResult.invalidInput('No PIN has been set');
       }
-      
+
+      print('[PinService] Stored PIN hash loaded, verifying...');
+
       // Verify PIN
       bool isValid = await _cryptoProvider.verifyPin(
         pin: pin,
         storedHash: storedHash,
       );
-      
+
       Duration authDuration = DateTime.now().difference(startTime);
-      
+
       if (isValid) {
         // Successful authentication
+        print('[PinService] Authentication successful (${authDuration.inMilliseconds}ms)');
         await _recordAttempt(AuthAttempt.create(
           result: AuthResult.success,
           duration: authDuration,
         ));
-        
+
         return PinAuthResult.success(
           requiresUpgrade: storedHash.needsUpgrade(),
         );
-        
+
       } else {
         // Failed authentication
+        print('[PinService] Authentication failed: Invalid PIN');
         await _recordAttempt(AuthAttempt.create(
           result: AuthResult.failure,
           duration: authDuration,
@@ -327,10 +352,51 @@ class PinServiceImpl implements IPinService {
   void dispose() {
     // Clear any cached sensitive data
     _cachedAttemptHistory = null;
-    
+
     // Note: Repository and crypto provider should handle their own cleanup
   }
-  
+
+  @override
+  Future<Map<String, dynamic>> runDiagnostics() async {
+    Map<String, dynamic> diagnostics = {
+      'timestamp': DateTime.now().toIso8601String(),
+      'service': 'PinServiceImpl',
+    };
+
+    try {
+      // Check storage availability
+      diagnostics['storageAvailable'] = await _storageRepository.isAvailable();
+
+      // Get storage info
+      Map<String, dynamic> storageInfo = await _storageRepository.getStorageInfo();
+      diagnostics['storage'] = storageInfo;
+
+      // Check if PIN is set
+      bool pinSet = await isPinSet();
+      diagnostics['isPinSet'] = pinSet;
+
+      // Get auth stats
+      Map<String, dynamic> authStats = await getAuthenticationStats();
+      diagnostics['authStats'] = authStats;
+
+      // Get lockout status
+      Duration? lockout = await getLockoutRemaining();
+      diagnostics['lockoutRemaining'] = lockout?.inSeconds;
+
+      // Run storage diagnostics
+      Map<String, dynamic> storageDiagnostics = await _storageRepository.runDiagnostics();
+      diagnostics['storageDiagnostics'] = storageDiagnostics;
+
+      diagnostics['status'] = 'ok';
+    } catch (e, stackTrace) {
+      diagnostics['status'] = 'error';
+      diagnostics['error'] = e.toString();
+      diagnostics['stackTrace'] = stackTrace.toString();
+    }
+
+    return diagnostics;
+  }
+
   /// Get attempt history with caching
   Future<AuthAttemptHistory> _getAttemptHistory() async {
     if (_cachedAttemptHistory == null) {

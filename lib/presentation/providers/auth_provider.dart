@@ -145,13 +145,26 @@ class AuthProvider extends ChangeNotifier {
     if (pin.length < 4 || pin.length > 8) {
       return false;
     }
-    
+
     // Must contain only digits
     if (!RegExp(r'^\d+$').hasMatch(pin)) {
       return false;
     }
-    
+
     // Check for common weak patterns (handled by PinService)
     return true;
+  }
+
+  /// Run comprehensive diagnostics for troubleshooting PIN issues
+  /// Use this when users report being stuck on PIN screen
+  Future<Map<String, dynamic>> runDiagnostics() async {
+    try {
+      return await _pinService.runDiagnostics();
+    } catch (e) {
+      return {
+        'status': 'error',
+        'error': 'Failed to run diagnostics: $e',
+      };
+    }
   }
 }

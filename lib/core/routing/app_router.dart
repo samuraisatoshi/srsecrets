@@ -10,30 +10,49 @@ import '../../presentation/screens/home/premium_home_screen.dart';
 /// Dependency inversion: Depends on abstractions (route states) not implementations
 class AppRouter {
   /// Determine initial route based on application state
+  ///
+  /// Flow:
+  /// 1. First launch/onboarding incomplete -> Onboarding
+  /// 2. User hasn't seen PIN setup -> PIN Setup (with skip option)
+  /// 3. PIN required but not set -> PIN Setup
+  /// 4. PIN required and set but not authenticated -> PIN Login
+  /// 5. Otherwise -> Home
   static Widget determineInitialRoute({
     required bool isAuthenticated,
     required bool isPinSet,
     required bool isOnboardingCompleted,
     required bool isFirstLaunch,
+    bool isPinRequired = false,
+    bool hasSeenPinSetup = false,
   }) {
     // Route determination logic follows clear precedence rules
-    
+
     // 1. First launch or incomplete onboarding -> Onboarding Flow
     if (isFirstLaunch || !isOnboardingCompleted) {
       return const OnboardingFlowScreen();
     }
-    
-    // 2. PIN not configured -> PIN Setup
+
+    // 2. User hasn't made PIN decision yet -> Show PIN Setup with Skip option
+    if (!hasSeenPinSetup) {
+      return const PremiumPinSetupScreen();
+    }
+
+    // 3. If PIN is not required, skip PIN login entirely
+    if (!isPinRequired) {
+      return const PremiumHomeScreen();
+    }
+
+    // 4. PIN required but not configured -> PIN Setup
     if (!isPinSet) {
       return const PremiumPinSetupScreen();
     }
-    
-    // 3. PIN configured but not authenticated -> PIN Login
+
+    // 5. PIN configured but not authenticated -> PIN Login
     if (!isAuthenticated) {
       return const PremiumPinLoginScreen();
     }
-    
-    // 4. Fully authenticated -> Main Application
+
+    // 6. Fully authenticated -> Main Application
     return const PremiumHomeScreen();
   }
 
@@ -43,9 +62,17 @@ class AppRouter {
     required bool isPinSet,
     required bool isOnboardingCompleted,
     required bool isFirstLaunch,
+    bool isPinRequired = false,
+    bool hasSeenPinSetup = false,
   }) {
     if (isFirstLaunch || !isOnboardingCompleted) {
       return '/onboarding';
+    }
+    if (!hasSeenPinSetup) {
+      return '/pin-setup';
+    }
+    if (!isPinRequired) {
+      return '/home';
     }
     if (!isPinSet) {
       return '/pin-setup';
