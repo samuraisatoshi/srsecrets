@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme/premium_theme.dart';
+import 'premium_keypad.dart';
 
 /// Premium PIN input widget matching Trezor/Ledger design standards
 class PremiumPinInput extends StatefulWidget {
@@ -36,7 +37,6 @@ class _PremiumPinInputState extends State<PremiumPinInput>
   late AnimationController _dotAnimationController;
   late AnimationController _errorAnimationController;
   late AnimationController _successAnimationController;
-  final List<AnimationController> _keyAnimationControllers = [];
   
   @override
   void initState() {
@@ -57,17 +57,7 @@ class _PremiumPinInputState extends State<PremiumPinInput>
       duration: const Duration(milliseconds: 600),
       vsync: this,
     );
-    
-    // Initialize key animation controllers
-    for (int i = 0; i < 12; i++) {
-      _keyAnimationControllers.add(
-        AnimationController(
-          duration: const Duration(milliseconds: 100),
-          vsync: this,
-        ),
-      );
-    }
-    
+
     _controller.addListener(_onTextChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _focusNode.requestFocus();
@@ -79,9 +69,6 @@ class _PremiumPinInputState extends State<PremiumPinInput>
     _dotAnimationController.dispose();
     _errorAnimationController.dispose();
     _successAnimationController.dispose();
-    for (var controller in _keyAnimationControllers) {
-      controller.dispose();
-    }
     _controller.dispose();
     _focusNode.dispose();
     super.dispose();
@@ -125,13 +112,6 @@ class _PremiumPinInputState extends State<PremiumPinInput>
 
   void _onKeyPressed(String key, int index) {
     if (widget.isLoading) return;
-    
-    // Animate key press
-    _keyAnimationControllers[index].forward().then((_) {
-      _keyAnimationControllers[index].reverse();
-    });
-    
-    HapticFeedback.lightImpact();
 
     if (key == 'backspace') {
       if (_pin.isNotEmpty) {
@@ -370,7 +350,14 @@ class _PremiumPinInputState extends State<PremiumPinInput>
             ),
           ),
         ] else ...[
-          _buildPremiumKeypad(context, isDark),
+          PremiumKeypad(
+            onKeyPressed: _onKeyPressed,
+            isEnabled: !widget.isLoading,
+            canSubmit: _canSubmit,
+            onSubmit: _submitPin,
+            isSetupMode: widget.isSetupMode,
+            submitLabel: 'Unlock',
+          ),
         ],
         
         // Error message if present
@@ -424,187 +411,6 @@ class _PremiumPinInputState extends State<PremiumPinInput>
         ],
       ],
     ),
-    );
-  }
-
-  Widget _buildPremiumKeypad(BuildContext context, bool isDark) {
-    final theme = Theme.of(context);
-    
-    return Column(
-      children: [
-        // Submit button
-        Container(
-          margin: const EdgeInsets.only(bottom: 16),
-          width: double.infinity,
-          height: 56,
-          child: ElevatedButton.icon(
-            onPressed: _canSubmit && !widget.isLoading ? _submitPin : null,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _canSubmit 
-                ? theme.colorScheme.primary 
-                : theme.colorScheme.surfaceContainerHighest,
-              foregroundColor: _canSubmit
-                ? theme.colorScheme.onPrimary
-                : theme.colorScheme.onSurfaceVariant,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              elevation: _canSubmit ? 2 : 0,
-            ),
-            icon: Icon(
-              _canSubmit ? Icons.lock_open : Icons.lock_outline,
-              size: 20,
-            ),
-            label: Text(
-              _canSubmit 
-                ? (widget.isSetupMode ? 'Set PIN' : 'Unlock')
-                : 'Enter ${widget.minLength}+ digits',
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ),
-        // Keypad
-        _buildKeypadGrid(context, isDark),
-      ],
-    );
-  }
-
-  Widget _buildKeypadGrid(BuildContext context, bool isDark) {
-    final keys = [
-      ['1', '2', '3'],
-      ['4', '5', '6'],
-      ['7', '8', '9'],
-      ['clear', '0', 'backspace'],
-    ];
-    
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        color: isDark
-            ? const Color(0xFF141824).withValues(alpha: 0.5)
-            : Colors.white.withValues(alpha: 0.5),
-      ),
-      child: Column(
-        children: [
-          for (int row = 0; row < keys.length; row++)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 6),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  for (int col = 0; col < keys[row].length; col++)
-                    _buildPremiumKey(
-                      context,
-                      keys[row][col],
-                      row * 3 + col,
-                      isDark,
-                    ),
-                ],
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPremiumKey(
-    BuildContext context,
-    String key,
-    int index,
-    bool isDark,
-  ) {
-    final theme = Theme.of(context);
-    IconData? icon;
-    String semanticLabel;
-    
-    if (key == 'clear') {
-      icon = Icons.clear_all_rounded;
-      semanticLabel = 'Clear all digits';
-    } else if (key == 'backspace') {
-      icon = Icons.backspace_outlined;
-      semanticLabel = 'Delete last digit';
-    } else {
-      semanticLabel = 'Enter digit $key';
-    }
-    
-    return Semantics(
-      label: semanticLabel,
-      button: true,
-      enabled: !widget.isLoading,
-      child: AnimatedBuilder(
-        animation: _keyAnimationControllers[index],
-        builder: (context, child) {
-          final scale = 1.0 - (_keyAnimationControllers[index].value * 0.05);
-          
-          return Transform.scale(
-            scale: scale,
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: widget.isLoading
-                    ? null
-                    : () => _onKeyPressed(key, index),
-                borderRadius: BorderRadius.circular(16),
-                splashColor: theme.colorScheme.primary.withValues(alpha: 0.1),
-                highlightColor: theme.colorScheme.primary.withValues(alpha: 0.05),
-                child: Container(
-                  width: 70,
-                  height: 70,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    gradient: LinearGradient(
-                      colors: isDark
-                          ? [
-                              const Color(0xFF1C2333),
-                              const Color(0xFF2A3142).withValues(alpha: 0.8),
-                            ]
-                          : [
-                              Colors.white,
-                              const Color(0xFFF8FAFC),
-                            ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    border: Border.all(
-                      color: isDark
-                          ? const Color(0xFF3A4357).withValues(alpha: 0.3)
-                          : const Color(0xFFE2E8F0),
-                      width: 1,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.05),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Center(
-                    child: icon != null
-                        ? Icon(
-                            icon,
-                            color: theme.colorScheme.onSurface,
-                            size: 28,
-                          )
-                        : Text(
-                            key,
-                            style: TextStyle(
-                              fontSize: 32,
-                              fontWeight: FontWeight.w600,
-                              color: theme.colorScheme.onSurface,
-                            ),
-                          ),
-                  ),
-                ),
-              ),
-            ),
-          );
-        },
-      ),
     );
   }
 }
