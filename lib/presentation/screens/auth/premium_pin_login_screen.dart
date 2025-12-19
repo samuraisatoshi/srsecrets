@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'dart:ui';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../widgets/premium_pin_input.dart';
 import '../../widgets/premium_security_card.dart';
+import '../../widgets/security_badges.dart';
 import '../../theme/premium_theme.dart';
 
 /// Premium PIN login screen matching Trezor/Ledger standards
@@ -110,10 +110,10 @@ class _PremiumPinLoginScreenState extends State<PremiumPinLoginScreen>
                         ),
                         
                         const SizedBox(height: 32),
-                        
+
                         // Security badges
-                        _buildSecurityBadges(context, isDark),
-                        
+                        const SecurityBadgesRow(),
+
                         const SizedBox(height: 24),
                       ],
                     ),
@@ -376,74 +376,6 @@ class _PremiumPinLoginScreenState extends State<PremiumPinLoginScreen>
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16),
               ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSecurityBadges(BuildContext context, bool isDark) {
-    final theme = Theme.of(context);
-    
-    return Wrap(
-      spacing: 16,
-      runSpacing: 12,
-      alignment: WrapAlignment.center,
-      children: [
-        _buildBadge(
-          context,
-          Icons.offline_bolt,
-          'Air-Gapped',
-          theme.colorScheme.primary,
-        ),
-        _buildBadge(
-          context,
-          Icons.lock,
-          'Encrypted',
-          theme.colorScheme.secondary,
-        ),
-        _buildBadge(
-          context,
-          Icons.verified_user,
-          'Zero-Knowledge',
-          theme.colorScheme.tertiary,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildBadge(
-    BuildContext context,
-    IconData icon,
-    String label,
-    Color color,
-  ) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: color.withValues(alpha: 0.2),
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icon,
-            size: 14,
-            color: color,
-          ),
-          const SizedBox(width: 6),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              color: color,
-              letterSpacing: 0.3,
             ),
           ),
         ],
