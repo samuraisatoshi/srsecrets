@@ -1,6 +1,9 @@
 /// Secure Storage Repository Implementation
 ///
-/// Provides secure file-based storage for PIN authentication data.
+/// Provides secure storage for PIN authentication data using:
+/// - Platform Keychain (iOS Keychain / Android Keystore) for PIN hash
+/// - File-based storage with secure deletion for attempt history
+///
 /// Infrastructure layer implementation of IPinStorageRepository.
 library;
 
@@ -14,29 +17,35 @@ import '../../domains/auth/models/pin_hash.dart';
 import '../../domains/auth/models/auth_attempt.dart';
 import '../../domains/crypto/random/secure_random.dart';
 import 'file_encryption_service.dart';
+import 'keychain_service.dart';
 
-/// File-based secure storage for authentication data
+/// Secure storage repository using platform keychain for sensitive data
 class SecureStorageRepository implements IPinStorageRepository {
   static const String _logName = 'SecureStorageRepository';
-  static const String _pinHashFile = 'pin_hash.dat';
+  static const String _pinHashKey = 'srsecrets_pin_hash';
+  static const String _pinHashFile = 'pin_hash.dat'; // Legacy, for migration
   static const String _attemptHistoryFile = 'auth_attempts.dat';
 
+  final IKeychainService _keychainService;
   final IFileEncryptionService _encryptionService;
   Directory? _secureDirectory;
+  bool _migrationChecked = false;
 
   SecureStorageRepository({
+    IKeychainService? keychainService,
     IFileEncryptionService? encryptionService,
-  }) : _encryptionService = encryptionService ?? XorFileEncryptionService();
+  })  : _keychainService = keychainService ?? FlutterKeychainService(),
+        _encryptionService = encryptionService ?? XorFileEncryptionService();
 
   // ============================================================
-  // Directory Management
+  // Directory Management (for attempt history)
   // ============================================================
 
   Future<void> _initializeDirectory() async {
     if (_secureDirectory != null && await _secureDirectory!.exists()) return;
 
     try {
-      print('[$_logName] Initializing secure storage directory');
+      developer.log('Initializing secure storage directory', name: _logName);
 
       Directory appDir = Platform.isIOS || Platform.isMacOS
           ? await getApplicationSupportDirectory()
@@ -44,22 +53,16 @@ class SecureStorageRepository implements IPinStorageRepository {
 
       _secureDirectory = Directory('${appDir.path}/secure_auth');
 
-      print('[$_logName] Secure directory path: ${_secureDirectory!.path}');
-
       if (!await _secureDirectory!.exists()) {
-        print('[$_logName] Creating secure directory...');
         await _secureDirectory!.create(recursive: true);
-        print('[$_logName] Secure directory created successfully');
 
         if (Platform.isLinux || Platform.isMacOS) {
           await Process.run('chmod', ['700', _secureDirectory!.path]);
         }
-      } else {
-        print('[$_logName] Secure directory already exists');
       }
     } catch (e, stackTrace) {
-      print('[$_logName] CRITICAL: Failed to init storage: $e');
-      print('[$_logName] Stack trace: $stackTrace');
+      developer.log('CRITICAL: Failed to init storage',
+          name: _logName, error: e, stackTrace: stackTrace);
       throw Exception('Failed to initialize secure storage: $e');
     }
   }
@@ -70,44 +73,31 @@ class SecureStorageRepository implements IPinStorageRepository {
   }
 
   // ============================================================
-  // PIN Hash Operations
+  // PIN Hash Operations (Keychain-backed)
   // ============================================================
 
   @override
   Future<PinHash?> loadPinHash() async {
     try {
-      print('[$_logName] Loading PIN hash...');
+      developer.log('Loading PIN hash from keychain...', name: _logName);
 
-      await _migrateOldData();
+      // Check for migration from file-based storage
+      await _migrateToKeychain();
 
-      String filePath = await _getFilePath(_pinHashFile);
-      File file = File(filePath);
+      // Load from keychain
+      final data = await _keychainService.readMap(_pinHashKey);
 
-      print('[$_logName] Checking file: $filePath');
-      bool fileExists = await file.exists();
-      print('[$_logName] File exists: $fileExists');
-
-      if (!fileExists) {
-        print('[$_logName] PIN hash file not found - returning null');
+      if (data == null) {
+        developer.log('PIN hash not found in keychain', name: _logName);
         return null;
       }
 
-      String encryptedContent = await file.readAsString();
-      print('[$_logName] File content length: ${encryptedContent.length}');
-
-      if (encryptedContent.isEmpty) {
-        print('[$_logName] PIN hash file is empty - returning null');
-        return null;
-      }
-
-      Map<String, dynamic> data = _encryptionService.decrypt(encryptedContent);
       PinHash pinHash = PinHash.fromMap(data);
-
-      print('[$_logName] PIN hash loaded successfully');
+      developer.log('PIN hash loaded from keychain successfully', name: _logName);
       return pinHash;
     } catch (e, stackTrace) {
-      print('[$_logName] ERROR loading PIN hash: $e');
-      print('[$_logName] Stack trace: $stackTrace');
+      developer.log('ERROR loading PIN hash',
+          name: _logName, error: e, stackTrace: stackTrace);
       return null;
     }
   }
@@ -115,21 +105,15 @@ class SecureStorageRepository implements IPinStorageRepository {
   @override
   Future<void> savePinHash(PinHash pinHash) async {
     try {
-      print('[$_logName] Saving PIN hash...');
-
-      String filePath = await _getFilePath(_pinHashFile);
-      print('[$_logName] File path: $filePath');
+      developer.log('Saving PIN hash to keychain...', name: _logName);
 
       Map<String, dynamic> data = pinHash.toMap();
-      String encryptedContent = _encryptionService.encrypt(data);
+      await _keychainService.writeMap(_pinHashKey, data);
 
-      File file = File(filePath);
-      await file.writeAsString(encryptedContent, flush: true);
-
-      print('[$_logName] PIN hash saved successfully');
+      developer.log('PIN hash saved to keychain successfully', name: _logName);
     } catch (e, stackTrace) {
-      print('[$_logName] ERROR saving PIN hash: $e');
-      print('[$_logName] Stack trace: $stackTrace');
+      developer.log('ERROR saving PIN hash',
+          name: _logName, error: e, stackTrace: stackTrace);
       throw Exception('Failed to save PIN hash: $e');
     }
   }
@@ -137,23 +121,18 @@ class SecureStorageRepository implements IPinStorageRepository {
   @override
   Future<void> deletePinHash() async {
     try {
-      developer.log('Deleting PIN hash', name: _logName);
-
-      String filePath = await _getFilePath(_pinHashFile);
-      File file = File(filePath);
-
-      if (await file.exists()) {
-        await _secureDeleteFile(file);
-        developer.log('PIN hash deleted', name: _logName);
-      }
+      developer.log('Deleting PIN hash from keychain', name: _logName);
+      await _keychainService.delete(_pinHashKey);
+      developer.log('PIN hash deleted from keychain', name: _logName);
     } catch (e, stackTrace) {
-      developer.log('ERROR deleting PIN hash', name: _logName, error: e, stackTrace: stackTrace);
+      developer.log('ERROR deleting PIN hash',
+          name: _logName, error: e, stackTrace: stackTrace);
       throw Exception('Failed to delete PIN hash: $e');
     }
   }
 
   // ============================================================
-  // Attempt History Operations
+  // Attempt History Operations (File-based with secure deletion)
   // ============================================================
 
   @override
@@ -165,7 +144,8 @@ class SecureStorageRepository implements IPinStorageRepository {
       File file = File(filePath);
 
       if (!await file.exists()) {
-        developer.log('Attempt history not found, returning empty', name: _logName);
+        developer.log('Attempt history not found, returning empty',
+            name: _logName);
         return AuthAttemptHistory([]);
       }
 
@@ -177,10 +157,12 @@ class SecureStorageRepository implements IPinStorageRepository {
       Map<String, dynamic> data = _encryptionService.decrypt(encryptedContent);
       AuthAttemptHistory history = AuthAttemptHistory.fromMap(data);
 
-      developer.log('Loaded ${history.attempts.length} attempts', name: _logName);
+      developer.log('Loaded ${history.attempts.length} attempts',
+          name: _logName);
       return history;
     } catch (e, stackTrace) {
-      developer.log('ERROR loading attempt history', name: _logName, error: e, stackTrace: stackTrace);
+      developer.log('ERROR loading attempt history',
+          name: _logName, error: e, stackTrace: stackTrace);
       return AuthAttemptHistory([]);
     }
   }
@@ -188,7 +170,8 @@ class SecureStorageRepository implements IPinStorageRepository {
   @override
   Future<void> saveAttemptHistory(AuthAttemptHistory history) async {
     try {
-      developer.log('Saving ${history.attempts.length} attempts', name: _logName);
+      developer.log('Saving ${history.attempts.length} attempts',
+          name: _logName);
 
       String filePath = await _getFilePath(_attemptHistoryFile);
       Map<String, dynamic> data = history.toMap();
@@ -199,7 +182,8 @@ class SecureStorageRepository implements IPinStorageRepository {
 
       developer.log('Attempt history saved', name: _logName);
     } catch (e, stackTrace) {
-      developer.log('ERROR saving attempt history', name: _logName, error: e, stackTrace: stackTrace);
+      developer.log('ERROR saving attempt history',
+          name: _logName, error: e, stackTrace: stackTrace);
       throw Exception('Failed to save attempt history: $e');
     }
   }
@@ -223,7 +207,8 @@ class SecureStorageRepository implements IPinStorageRepository {
 
       developer.log('All auth data cleared', name: _logName);
     } catch (e, stackTrace) {
-      developer.log('ERROR clearing auth data', name: _logName, error: e, stackTrace: stackTrace);
+      developer.log('ERROR clearing auth data',
+          name: _logName, error: e, stackTrace: stackTrace);
       throw Exception('Failed to clear auth data: $e');
     }
   }
@@ -244,19 +229,19 @@ class SecureStorageRepository implements IPinStorageRepository {
     try {
       await _initializeDirectory();
 
-      String pinPath = await _getFilePath(_pinHashFile);
       String attemptPath = await _getFilePath(_attemptHistoryFile);
-
-      File pinFile = File(pinPath);
       File attemptFile = File(attemptPath);
 
+      final pinHashExists = await _keychainService.containsKey(_pinHashKey);
+
       return {
+        'storageType': 'keychain',
         'directoryPath': _secureDirectory?.path,
         'directoryExists': await _secureDirectory?.exists() ?? false,
-        'pinHashFileExists': await pinFile.exists(),
-        'pinHashFileSize': await pinFile.exists() ? await pinFile.length() : 0,
+        'pinHashInKeychain': pinHashExists,
         'attemptHistoryFileExists': await attemptFile.exists(),
-        'attemptHistoryFileSize': await attemptFile.exists() ? await attemptFile.length() : 0,
+        'attemptHistoryFileSize':
+            await attemptFile.exists() ? await attemptFile.length() : 0,
       };
     } catch (e) {
       developer.log('ERROR getting storage info', name: _logName, error: e);
@@ -273,6 +258,7 @@ class SecureStorageRepository implements IPinStorageRepository {
     try {
       diagnostics['directoryInitialized'] = _secureDirectory != null;
       diagnostics['storageAvailable'] = await isAvailable();
+      diagnostics['storageType'] = 'platform_keychain';
       diagnostics.addAll(await getStorageInfo());
 
       try {
@@ -290,7 +276,8 @@ class SecureStorageRepository implements IPinStorageRepository {
 
       developer.log('Diagnostics complete', name: _logName);
     } catch (e, stackTrace) {
-      developer.log('Diagnostics failed', name: _logName, error: e, stackTrace: stackTrace);
+      developer.log('Diagnostics failed',
+          name: _logName, error: e, stackTrace: stackTrace);
       diagnostics['diagnosticsError'] = e.toString();
     }
 
@@ -301,6 +288,7 @@ class SecureStorageRepository implements IPinStorageRepository {
   // Private Helpers
   // ============================================================
 
+  /// Secure file deletion with multi-pass overwrite
   Future<void> _secureDeleteFile(File file) async {
     try {
       int fileSize = await file.length();
@@ -324,68 +312,48 @@ class SecureStorageRepository implements IPinStorageRepository {
     }
   }
 
-  Future<void> _migrateOldData() async {
-    // Migration is only needed on iOS/macOS where we moved from Documents to Application Support
-    // On Android, both getApplicationDocumentsDirectory() and the current storage location are the same
-    // So we should skip migration entirely on Android to avoid deleting current data
-    if (Platform.isAndroid) {
-      return;
-    }
+  /// Migrate PIN hash from legacy file-based storage to keychain
+  Future<void> _migrateToKeychain() async {
+    if (_migrationChecked) return;
+    _migrationChecked = true;
 
     try {
-      Directory oldDocDir = await getApplicationDocumentsDirectory();
-      Directory oldSecureDir = Directory('${oldDocDir.path}/secure_auth');
-
-      if (!await oldSecureDir.exists()) return;
-
-      // Double-check: if old path equals new path, skip migration
-      await _initializeDirectory();
-      if (oldSecureDir.path == _secureDirectory!.path) {
-        print('[$_logName] Skipping migration - old and new paths are identical');
+      // Check if already in keychain
+      if (await _keychainService.containsKey(_pinHashKey)) {
+        developer.log('PIN hash already in keychain, skipping migration',
+            name: _logName);
         return;
       }
 
-      print('[$_logName] Found old storage at ${oldSecureDir.path}, migrating...');
+      // Check for legacy file
+      String filePath = await _getFilePath(_pinHashFile);
+      File legacyFile = File(filePath);
 
-      File oldPinFile = File('${oldSecureDir.path}/$_pinHashFile');
-      String newPinPath = await _getFilePath(_pinHashFile);
-      File newPinFile = File(newPinPath);
-
-      if (await oldPinFile.exists() && !await newPinFile.exists()) {
-        print('[$_logName] Migrating PIN data');
-        await oldPinFile.copy(newPinPath);
-
-        File oldAttemptFile = File('${oldSecureDir.path}/$_attemptHistoryFile');
-        if (await oldAttemptFile.exists()) {
-          String newAttemptPath = await _getFilePath(_attemptHistoryFile);
-          await oldAttemptFile.copy(newAttemptPath);
-        }
-
-        print('[$_logName] Migration complete');
+      if (!await legacyFile.exists()) {
+        developer.log('No legacy PIN file found', name: _logName);
+        return;
       }
 
-      await _cleanupOldDirectory(oldSecureDir);
-    } catch (e, stackTrace) {
-      print('[$_logName] Migration error (non-fatal): $e');
-    }
-  }
+      developer.log('Migrating PIN hash from file to keychain...', name: _logName);
 
-  Future<void> _cleanupOldDirectory(Directory oldDir) async {
-    try {
-      if (!await oldDir.exists()) return;
-
-      developer.log('Cleaning old directory', name: _logName);
-
-      await for (var entity in oldDir.list()) {
-        if (entity is File) {
-          await _secureDeleteFile(entity);
-        }
+      // Read from legacy file
+      String encryptedContent = await legacyFile.readAsString();
+      if (encryptedContent.isEmpty) {
+        await _secureDeleteFile(legacyFile);
+        return;
       }
-      await oldDir.delete(recursive: true);
 
-      developer.log('Old directory cleaned', name: _logName);
+      // Decrypt and migrate to keychain
+      Map<String, dynamic> data = _encryptionService.decrypt(encryptedContent);
+      await _keychainService.writeMap(_pinHashKey, data);
+
+      // Securely delete legacy file
+      await _secureDeleteFile(legacyFile);
+
+      developer.log('PIN hash migrated to keychain successfully', name: _logName);
     } catch (e, stackTrace) {
-      developer.log('Cleanup error', name: _logName, error: e, stackTrace: stackTrace);
+      developer.log('Migration error (non-fatal)',
+          name: _logName, error: e, stackTrace: stackTrace);
     }
   }
 }

@@ -96,9 +96,10 @@ SRSecrets operates **completely offline**:
 │  • Constant-time polynomial operations                  │
 ├─────────────────────────────────────────────────────────┤
 │                SECURE STORAGE                            │
-│  • XOR encryption with derived keys                     │
+│  • iOS: Keychain Services (Secure Enclave backed)       │
+│  • Android: EncryptedSharedPreferences + Keystore       │
 │  • Secure file deletion (multi-pass overwrite)          │
-│  • Platform keychain integration                        │
+│  • Automatic migration from legacy storage              │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -112,6 +113,8 @@ SRSecrets operates **completely offline**:
 | File recovery | Multi-pass secure deletion |
 | Side-channel attacks | Constant-time cryptographic operations |
 | Single point of failure | Threshold-based secret sharing |
+| Rooted device extraction | Hardware-backed keychain (TEE/Secure Enclave) |
+| Backup extraction | Keychain data excluded from unencrypted backups |
 
 ### What You Must Protect
 
