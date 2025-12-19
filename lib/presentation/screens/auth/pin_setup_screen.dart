@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 
 import '../../providers/auth_provider.dart';
 import '../../widgets/pin_input_widget.dart';
+import '../../../domains/i18n/providers/i18n_provider.dart';
+import '../../../l10n/app_localizations.dart';
 
 class PinSetupScreen extends StatefulWidget {
   const PinSetupScreen({super.key});
@@ -39,9 +41,10 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
 
   Future<void> _setupPin() async {
     if (_pin != _confirmPin) {
+      final l10n = AppLocalizations.of(context)!;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('PINs do not match. Please try again.'),
+        SnackBar(
+          content: Text(l10n.pinMismatchError),
           backgroundColor: Colors.red,
         ),
       );
@@ -55,7 +58,7 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
     if (!success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(authProvider.errorMessage ?? 'Failed to setup PIN'),
+          content: Text(authProvider.errorMessage ?? AppLocalizations.of(context)!.pinSetupFailed),
           backgroundColor: Colors.red,
         ),
       );
@@ -97,6 +100,8 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
 
   Widget _buildSetupPage(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
+    final i18nProvider = context.watch<I18nProvider>();
     
     return Padding(
       padding: const EdgeInsets.all(24.0),
@@ -110,20 +115,20 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
           ),
           const SizedBox(height: 32),
           Text(
-            'Welcome to SRSecrets',
+            l10n.welcomeTitle,
             style: theme.textTheme.headlineMedium?.copyWith(
               color: theme.colorScheme.onSurface,
               fontWeight: FontWeight.bold,
             ),
-            textAlign: TextAlign.center,
+            textAlign: i18nProvider.getTextAlign(),
           ),
           const SizedBox(height: 16),
           Text(
-            'Secure your secrets with Shamir\'s Secret Sharing',
+            l10n.pinSetupWelcomeSubtitle,
             style: theme.textTheme.bodyLarge?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
-            textAlign: TextAlign.center,
+            textAlign: i18nProvider.getTextAlign(),
           ),
           const SizedBox(height: 48),
           Card(
@@ -139,18 +144,18 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'Setup Your PIN',
+                    l10n.pinSetupTitle,
                     style: theme.textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Create a 4-8 digit PIN to secure your secrets',
+                    l10n.pinSetupInstructions,
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
-                    textAlign: TextAlign.center,
+                    textAlign: i18nProvider.getTextAlign(),
                   ),
                   const SizedBox(height: 24),
                   PinInputWidget(
@@ -179,7 +184,7 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Your PIN protects access to all cryptographic operations. Choose a secure PIN that you can remember.',
+                    l10n.pinSetupSecurityNotice,
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSecondaryContainer,
                     ),
@@ -195,6 +200,8 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
 
   Widget _buildConfirmPage(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
+    final i18nProvider = context.watch<I18nProvider>();
     
     return Padding(
       padding: const EdgeInsets.all(24.0),
@@ -208,16 +215,16 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
           ),
           const SizedBox(height: 32),
           Text(
-            'Confirm Your PIN',
+            l10n.pinConfirmTitle,
             style: theme.textTheme.headlineMedium?.copyWith(
               color: theme.colorScheme.onSurface,
               fontWeight: FontWeight.bold,
             ),
-            textAlign: TextAlign.center,
+            textAlign: i18nProvider.getTextAlign(),
           ),
           const SizedBox(height: 16),
           Text(
-            'Enter your PIN again to confirm',
+            l10n.pinConfirmSubtitle,
             style: theme.textTheme.bodyLarge?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
@@ -244,7 +251,7 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
             onPressed: context.watch<AuthProvider>().isLoading ? null : () {
               _resetSetup();
             },
-            child: const Text('Go Back'),
+            child: Text(l10n.buttonGoBack),
           ),
         ],
       ),

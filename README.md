@@ -4,6 +4,8 @@
 
 SRSecrets is an air-gapped mobile application that implements Shamir's Secret Sharing algorithm to securely split and reconstruct sensitive data. Built with Flutter following Domain-Driven Design (DDD) and SOLID principles.
 
+> **Disclaimer**: 100% of this codebase was produced using [Claude Code CLI](https://claude.ai/claude-code) by Anthropic. This includes all source code, architecture decisions, documentation, cryptographic implementations, and security features.
+
 ---
 
 ## Table of Contents

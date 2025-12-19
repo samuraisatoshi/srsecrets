@@ -3,9 +3,13 @@ import 'package:provider/provider.dart';
 
 import '../../providers/auth_provider.dart';
 import '../../providers/secret_provider.dart';
+import '../../../domains/i18n/providers/i18n_provider.dart';
+import '../../../l10n/app_localizations.dart';
 import '../secrets/secrets_list_screen.dart';
 import '../secrets/create_secret_screen.dart';
 import '../secrets/reconstruct_secret_screen.dart';
+import '../settings/settings_screen.dart';
+import '../../widgets/localized_navigation_rail.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -31,6 +35,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final i18nProvider = context.watch<I18nProvider>();
+    
     return ChangeNotifierProvider(
       create: (context) => SecretProvider(),
       child: LayoutBuilder(
@@ -40,10 +47,21 @@ class _HomeScreenState extends State<HomeScreen> {
           
           return Scaffold(
             appBar: AppBar(
-              title: const Text('SRSecrets'),
+              title: Text(l10n.appTitle),
               actions: [
+                IconButton(
+                  icon: const Icon(Icons.settings),
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => const SettingsScreen(),
+                      ),
+                    );
+                  },
+                  tooltip: l10n.navSettings,
+                ),
                 Semantics(
-                  label: 'Account menu',
+                  label: l10n.accessibilityOpenMenu,
                   hint: 'Access logout and account options',
                   button: true,
                   child: PopupMenuButton<String>(
@@ -59,11 +77,11 @@ class _HomeScreenState extends State<HomeScreen> {
                           child: Semantics(
                             label: 'Logout from application',
                             button: true,
-                            child: const Row(
+                            child: Row(
                               children: [
-                                Icon(Icons.logout),
-                                SizedBox(width: 8),
-                                Text('Logout'),
+                                const Icon(Icons.logout),
+                                const SizedBox(width: 8),
+                                Text(l10n.buttonLogout),
                               ],
                             ),
                           ),

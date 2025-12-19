@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 
 import '../../providers/auth_provider.dart';
 import '../../widgets/pin_input_widget.dart';
+import '../../../domains/i18n/providers/i18n_provider.dart';
+import '../../../l10n/app_localizations.dart';
 
 class PinLoginScreen extends StatefulWidget {
   const PinLoginScreen({super.key});
@@ -21,6 +23,8 @@ class _PinLoginScreenState extends State<PinLoginScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final authProvider = context.watch<AuthProvider>();
+    final l10n = AppLocalizations.of(context)!;
+    final i18nProvider = context.watch<I18nProvider>();
     
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
@@ -37,20 +41,20 @@ class _PinLoginScreenState extends State<PinLoginScreen> {
               ),
               const SizedBox(height: 32),
               Text(
-                'Enter Your PIN',
+                l10n.pinLoginTitle,
                 style: theme.textTheme.headlineMedium?.copyWith(
                   color: theme.colorScheme.onSurface,
                   fontWeight: FontWeight.bold,
                 ),
-                textAlign: TextAlign.center,
+                textAlign: i18nProvider.getTextAlign(),
               ),
               const SizedBox(height: 16),
               Text(
-                'Unlock your secrets with your secure PIN',
+                l10n.pinLoginSubtitle,
                 style: theme.textTheme.bodyLarge?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
-                textAlign: TextAlign.center,
+                textAlign: i18nProvider.getTextAlign(),
               ),
               const SizedBox(height: 48),
               Card(
@@ -75,18 +79,18 @@ class _PinLoginScreenState extends State<PinLoginScreen> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'Too many failed attempts. Please wait ${_formatDuration(authProvider.lockoutDuration)}',
+                          l10n.pinLockoutMessage(_formatDuration(authProvider.lockoutDuration)),
                           style: theme.textTheme.bodyMedium?.copyWith(
                             color: theme.colorScheme.error,
                           ),
-                          textAlign: TextAlign.center,
+                          textAlign: i18nProvider.getTextAlign(),
                         ),
                         const SizedBox(height: 24),
                         ElevatedButton(
                           onPressed: () {
                             context.read<AuthProvider>().checkAuthStatus();
                           },
-                          child: const Text('Check Status'),
+                          child: Text(l10n.buttonCheckStatus),
                         ),
                       ] else ...[
                         PinInputWidget(

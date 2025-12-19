@@ -368,28 +368,38 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       child: SingleChildScrollView(
         child: ConstrainedBox(
           constraints: BoxConstraints(
-            minHeight: MediaQuery.of(context).size.height - 
-                       MediaQuery.of(context).padding.top - 
-                       MediaQuery.of(context).padding.bottom - 
-                       120, // Account for top and bottom toolbars
+            minHeight: math.max(400, MediaQuery.of(context).size.height * 0.6),
           ),
-          child: Column(
-            children: [
-              const SizedBox(height: 20), // Minimal space for top navigation
-              
-              // Hero section with animated icon
-              SizedBox(
-                height: 300,
-                child: _buildHeroSection(data, theme, isDark, size),
-              ),
-              
-              const SizedBox(height: 24),
-              
-              // Content section
-              _buildContentSection(data, theme, isDark),
-              
-              const SizedBox(height: 20), // Minimal space for bottom navigation
-            ],
+          child: IntrinsicHeight(
+            child: Column(
+              children: [
+                const SizedBox(height: 20),
+                
+                // Hero section with flexible height
+                Flexible(
+                  flex: 2,
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(
+                        minHeight: 200,
+                        maxHeight: 350,
+                      ),
+                      child: _buildHeroSection(data, theme, isDark, size),
+                    ),
+                  ),
+                ),
+                
+                const SizedBox(height: 24),
+                
+                // Content section with flexible height
+                Flexible(
+                  flex: 3,
+                  child: _buildContentSection(data, theme, isDark),
+                ),
+                
+                const SizedBox(height: 20),
+              ],
+            ),
           ),
         ),
       ),
@@ -516,10 +526,14 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     ThemeData theme,
     bool isDark,
   ) {
-    return Container(
-      width: 120,
-      height: 100,
-      padding: const EdgeInsets.all(12),
+    return Flexible(
+      child: Container(
+        constraints: const BoxConstraints(
+          minWidth: 120,
+          minHeight: 100,
+          maxWidth: 160,
+        ),
+        padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
@@ -533,33 +547,44 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           width: 1,
         ),
       ),
-      child: Column(
-        children: [
-          Icon(
-            icon,
-            color: isPositive ? Colors.green : Colors.red,
-            size: 24,
-          ),
-          const SizedBox(height: 8),
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              color: theme.colorScheme.onSurface,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              color: isPositive ? Colors.green : Colors.red,
+              size: 24,
             ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            subtitle,
-            style: TextStyle(
-              fontSize: 9,
-              color: theme.colorScheme.onSurfaceVariant,
+            const SizedBox(height: 8),
+            Flexible(
+              child: Text(
+                title,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: theme.colorScheme.onSurface,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
-            textAlign: TextAlign.center,
-          ),
-        ],
+            const SizedBox(height: 4),
+            Flexible(
+              child: Text(
+                subtitle,
+                style: TextStyle(
+                  fontSize: 9,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                softWrap: true,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
