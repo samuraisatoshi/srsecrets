@@ -7,7 +7,7 @@ library;
 import 'package:flutter/foundation.dart';
 import '../../domains/settings/models/app_settings.dart';
 import '../../domains/settings/repositories/settings_repository.dart';
-import '../../domains/settings/repositories/shared_prefs_settings_repository.dart';
+import '../../infrastructure/persistence/shared_prefs_settings_repository.dart';
 
 /// Provider for application settings state management
 class SettingsProvider extends ChangeNotifier {

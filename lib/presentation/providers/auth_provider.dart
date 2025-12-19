@@ -2,12 +2,14 @@ import 'package:flutter/foundation.dart';
 
 import '../../domains/auth/services/pin_service.dart';
 import '../../domains/auth/services/pin_service_impl.dart';
+import '../../domains/auth/services/pin_validator.dart';
 import '../../domains/auth/providers/pbkdf2_crypto_provider.dart';
-import '../../domains/auth/repositories/secure_storage_repository.dart';
+import '../../infrastructure/persistence/secure_storage_repository.dart';
 
+/// Provider for authentication state management
 class AuthProvider extends ChangeNotifier {
   final IPinService _pinService;
-  
+
   bool _isLoading = false;
   bool _isAuthenticated = false;
   bool _isPinSet = false;
@@ -16,11 +18,15 @@ class AuthProvider extends ChangeNotifier {
   bool _isLocked = false;
   Duration _lockoutDuration = Duration.zero;
 
-  AuthProvider()
-      : _pinService = PinServiceImpl(
-          cryptoProvider: Pbkdf2CryptoProvider(),
-          storageRepository: SecureStorageRepository(),
-        );
+  /// Constructor with dependency injection
+  /// Falls back to default implementations if not provided
+  AuthProvider({IPinService? pinService})
+      : _pinService = pinService ??
+            PinServiceImpl(
+              storageRepository: SecureStorageRepository(),
+              cryptoProvider: Pbkdf2CryptoProvider(),
+              pinValidator: const PinValidator(),
+            );
 
   // Getters
   bool get isLoading => _isLoading;

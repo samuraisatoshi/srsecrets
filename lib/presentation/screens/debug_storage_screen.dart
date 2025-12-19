@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../utils/pin_storage_diagnostic.dart';
-import '../../domains/auth/repositories/secure_storage_repository.dart';
+import '../../infrastructure/persistence/secure_storage_repository.dart';
 
 class DebugStorageScreen extends StatefulWidget {
   const DebugStorageScreen({super.key});

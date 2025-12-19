@@ -7,8 +7,8 @@ library;
 import 'dart:convert';
 import 'dart:developer' as developer;
 import 'package:shared_preferences/shared_preferences.dart';
-import '../models/app_settings.dart';
-import 'settings_repository.dart';
+import '../../domains/settings/models/app_settings.dart';
+import '../../domains/settings/repositories/settings_repository.dart';
 
 /// SharedPreferences-based implementation of settings repository
 class SharedPrefsSettingsRepository implements ISettingsRepository {
