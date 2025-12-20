@@ -7,6 +7,7 @@ import '../../widgets/premium_security_card.dart';
 import '../../widgets/app_branding_logo.dart';
 import '../../widgets/pin_security_info.dart';
 import '../../widgets/skip_pin_dialog.dart';
+import '../home/premium_home_screen.dart';
 
 /// Premium PIN setup screen matching Trezor/Ledger standards
 class PremiumPinSetupScreen extends StatefulWidget {
@@ -98,9 +99,14 @@ class _PremiumPinSetupScreenState extends State<PremiumPinSetupScreen>
     if (success && mounted) {
       // Mark PIN as required and hasSeenPinSetup
       await settingsProvider.setPinRequired(true);
-      // Navigation will happen automatically via provider state change in main.dart
-      // At this point: isPinSet=true, isAuthenticated=true, hasSeenPinSetup=true, isPinRequired=true
-      // Router will navigate to HomeScreen
+      // Navigate to HomeScreen
+      if (mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (context) => const PremiumHomeScreen(),
+          ),
+        );
+      }
     } else if (!success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -359,7 +365,15 @@ class _PremiumPinSetupScreenState extends State<PremiumPinSetupScreen>
     final shouldSkip = await showSkipPinDialog(context);
     if (shouldSkip == true && mounted) {
       final settingsProvider = context.read<SettingsProvider>();
-      settingsProvider.setPinRequired(false);
+      await settingsProvider.setPinRequired(false);
+      // Navigate to HomeScreen after skipping PIN setup
+      if (mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (context) => const PremiumHomeScreen(),
+          ),
+        );
+      }
     }
   }
 }

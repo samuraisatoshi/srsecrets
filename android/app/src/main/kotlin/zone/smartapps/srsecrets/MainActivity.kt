@@ -1,4 +1,4 @@
-package com.example.srsecrets
+package zone.smartapps.srsecrets
 
 import io.flutter.embedding.android.FlutterActivity
 
